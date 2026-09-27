@@ -20,7 +20,7 @@ public class TrackSpawner : MonoBehaviour
 
     [Header("Çeşitlilik")]
     [Tooltip("İki komşu şerit arasında kayan engel (ObstacleMover Sway)")]
-    public GameObject swayingObstaclePrefab;
+    public GameObject[] swayingObstaclePrefabs;
     [Range(0f, 1f)] public float swayChance = 0.3f;
     [Tooltip("Nadir taksi: altınları çeker, engeller can götürmez, en yüksek hız")]
     public GameObject taxiPrefab;
@@ -64,8 +64,13 @@ public class TrackSpawner : MonoBehaviour
             var ob = o ? o.GetComponent<Obstacle>() : null;
             if (ob && ob.minLevel <= level.levelNumber) obstacles.Add(o);
         }
-        var sway = swayingObstaclePrefab ? swayingObstaclePrefab.GetComponent<Obstacle>() : null;
-        bool canSway = sway && sway.minLevel <= level.levelNumber;
+        var sways = new List<GameObject>();
+        if (swayingObstaclePrefabs != null)
+            foreach (var o in swayingObstaclePrefabs)
+            {
+                var ob = o ? o.GetComponent<Obstacle>() : null;
+                if (ob && ob.minLevel <= level.levelNumber) sways.Add(o);
+            }
         bool taxiPlaced = false;
 
         // 3) Her segmente içerik
@@ -82,10 +87,10 @@ public class TrackSpawner : MonoBehaviour
 
             // Engeller: serbest şerit dışındaki şeritlere.
             // Serbest şerit kenardaysa diğer iki şerit komşudur: aralarında kayan tek bir engel olabilir.
-            if (canSway && freeLane != 1 && Random.value < swayChance * level.obstacleChance)
+            if (sways.Count > 0 && freeLane != 1 && Random.value < swayChance * level.obstacleChance)
             {
                 int a = freeLane == 0 ? 1 : 0;
-                Spawn(swayingObstaclePrefab, (LanePos(a, z) + LanePos(a + 1, z)) * 0.5f);
+                Spawn(sways[Random.Range(0, sways.Count)], (LanePos(a, z) + LanePos(a + 1, z)) * 0.5f);
             }
             else
             {

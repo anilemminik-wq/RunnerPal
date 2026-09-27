@@ -179,6 +179,43 @@ sun.transform.rotation = UnityEngine.Quaternion.Euler(50f, -30f, 0f);
 sun.intensity = 1.2f;
 sun.shadows = UnityEngine.LightShadows.Soft;
 
+// Cartoon art pass: a light global post-process (vivid colors, soft bloom, gentle vignette) ties every scene's
+// look together, on top of the game's own rounded-corner geometry.
+System.Func<UnityEngine.Camera, UnityEngine.GameObject> addPolish = camera =>
+{
+    var camData = camera.GetComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>();
+    if (!camData) camData = camera.gameObject.AddComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>();
+    camData.renderPostProcessing = true;
+    string path = root + "Settings/ToonPostProcess.asset";
+    var profile = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.VolumeProfile>(path);
+    if (!profile)
+    {
+        if (!UnityEditor.AssetDatabase.IsValidFolder(root + "Settings")) UnityEditor.AssetDatabase.CreateFolder("Assets/RunnerPal", "Settings");
+        profile = UnityEngine.ScriptableObject.CreateInstance<UnityEngine.Rendering.VolumeProfile>();
+        UnityEditor.AssetDatabase.CreateAsset(profile, path);
+    }
+    T Comp<T>() where T : UnityEngine.Rendering.VolumeComponent { profile.TryGet<T>(out var c); if (!c) c = profile.Add<T>(true); return c; }
+    var tone = Comp<UnityEngine.Rendering.Universal.Tonemapping>();
+    tone.mode.Override(UnityEngine.Rendering.Universal.TonemappingMode.Neutral);
+    var bloom = Comp<UnityEngine.Rendering.Universal.Bloom>();
+    bloom.threshold.Override(1.05f);
+    bloom.intensity.Override(0.35f);
+    bloom.scatter.Override(0.6f);
+    var color = Comp<UnityEngine.Rendering.Universal.ColorAdjustments>();
+    color.postExposure.Override(0.1f);
+    color.saturation.Override(14f);
+    color.contrast.Override(6f);
+    var vignette = Comp<UnityEngine.Rendering.Universal.Vignette>();
+    vignette.intensity.Override(0.18f);
+    vignette.smoothness.Override(0.8f);
+    UnityEditor.EditorUtility.SetDirty(profile);
+    var volGo = new UnityEngine.GameObject("GlobalVolume");
+    var vol = volGo.AddComponent<UnityEngine.Rendering.Volume>();
+    vol.isGlobal = true;
+    vol.profile = profile;
+    return volGo;
+};
+
 // Player: capsule collider spanning 0..2 m (transform at y = 1), model under ModelRoot with its feet at y = 0.
 var playerGo = new UnityEngine.GameObject("Player");
 playerGo.tag = "Player";
@@ -217,6 +254,7 @@ cam.farClipPlane = 220f;
 cam.clearFlags = UnityEngine.CameraClearFlags.Skybox;
 var follow = cam.gameObject.AddComponent<CameraFollow>();
 follow.target = playerGo.transform;
+addPolish(cam);
 // Higher and further back than the script default so the runner does not hide the lanes ahead.
 follow.offset = new UnityEngine.Vector3(0f, 5.2f, -8.5f);
 
@@ -224,9 +262,9 @@ var spawnerGo = new UnityEngine.GameObject("TrackSpawner");
 var spawner = spawnerGo.AddComponent<TrackSpawner>();
 // Low / high barriers from the start; manhole (3), parked car (5), oncoming car (12) unlock later (Obstacle.minLevel).
 spawner.obstaclePrefabs = new[] { prefab("Obstacle_Low"), prefab("Obstacle_High"), prefab("Obstacle_Low"), prefab("Obstacle_High"), prefab("Obstacle_Manhole"), prefab("Obstacle_ParkedCar"), prefab("Obstacle_Car") };
-spawner.swayingObstaclePrefab = prefab("Obstacle_Sway");
+spawner.swayingObstaclePrefabs = new[] { prefab("Obstacle_Sway"), prefab("Obstacle_Dog") };
 spawner.taxiPrefab = prefab("Taxi");
-if (spawner.taxiPrefab == null || spawner.swayingObstaclePrefab == null) throw new System.Exception("run build_assets.cs first (Taxi / Obstacle_Sway missing)");
+if (spawner.taxiPrefab == null || spawner.swayingObstaclePrefabs[0] == null || spawner.swayingObstaclePrefabs[1] == null) throw new System.Exception("run build_assets.cs first (Taxi / Obstacle_Sway missing)");
 spawner.goldPrefab = prefab("Gold");
 spawner.speedBoostPrefab = prefab("SpeedBoost");
 spawner.shieldPrefab = prefab("Shield");

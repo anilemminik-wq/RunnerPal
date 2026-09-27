@@ -7,6 +7,21 @@
 
 Last updated: 2026-09-27. Read this first, then `CLAUDE.md`, then `RUNNERPAL_TASK.md` for the full spec.
 
+
+## Cartoon art pass (2026-09-27)
+
+- Every box/cylinder the game builds itself (props, obstacles, road furniture, debris) now uses
+  `ProceduralMesh.RoundedBox` / `RoundedCylinder` (`Scripts/Core/ProceduralMesh.cs`, runtime-safe, not
+  editor-only) instead of Unity's sharp default primitives, so the whole game reads as one soft, "polished"
+  style. A shared global post-process volume (`Settings/ToonPostProcess.asset`: Neutral tonemapping, light
+  bloom, +saturation/contrast, gentle vignette) ties the look together in the Game scene.
+- **New obstacle: stray dog** (`Obstacle.Kind.Critter`, `Prefabs/Obstacle_Dog`, procedural rounded-box model,
+  level 6+): trots between the two blocked lanes (`ObstacleMover.Sway`, same safe pattern as `Obstacle_Sway`)
+  so it always leaves the guaranteed-clear lane open; on hit it flinches and runs off (`CritterFlee`) instead
+  of breaking apart — costs a life like any other obstacle, but never gibbed (kept cute).
+  `TrackSpawner.swayingObstaclePrefab` -> `swayingObstaclePrefabs[]` (picks one at random) to fit it in
+  alongside the swaying barrier.
+- City buildings (Kenney kits) were left as-is — re-texturing/rebuilding those was out of scope for this pass.
 ## Where things stand
 
 - Project created with the Unity CLI from the 3D URP template; the spec's scripts are in

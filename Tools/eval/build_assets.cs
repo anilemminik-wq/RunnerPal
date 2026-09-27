@@ -139,16 +139,35 @@ sprite("Lock", 128, (x, y) =>
 });
 
 // ---------- Prefab helpers ----------
+// Cartoon art pass: every box/cylinder the game builds itself gets soft, rounded corners (ProceduralMesh) instead
+// of Unity's sharp default primitives, so the whole game reads as one consistent, "polished" style. Saved to disk
+// once (like the baked clothes meshes) so prefabs keep a live reference across rebuilds.
+System.Func<string, UnityEngine.Mesh, UnityEngine.Mesh> saveMesh = (name, mesh) =>
+{
+    string path = root + "Models/" + name + ".asset";
+    var existing = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.Mesh>(path);
+    if (existing != null) { UnityEditor.EditorUtility.CopySerialized(mesh, existing); existing.name = name; UnityEngine.Object.DestroyImmediate(mesh); UnityEditor.EditorUtility.SetDirty(existing); }
+    else { mesh.name = name; UnityEditor.AssetDatabase.CreateAsset(mesh, path); }
+    UnityEditor.AssetDatabase.SaveAssets();
+    return UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.Mesh>(path);
+};
+var roundedCubeMesh = saveMesh("Prim_RoundedCube", ProceduralMesh.RoundedBox(UnityEngine.Vector3.one, 0.22f, 4));
+var roundedCylinderMesh = saveMesh("Prim_RoundedCylinder", ProceduralMesh.RoundedCylinder(0.5f, 1f, 0.16f, 10, 3));
 System.Func<UnityEngine.PrimitiveType, string, UnityEngine.Transform, UnityEngine.Vector3, UnityEngine.Vector3, UnityEngine.Material, bool, UnityEngine.GameObject> part =
     (type, name, parent, pos, scale, material, keepCollider) =>
 {
-    var go = UnityEngine.GameObject.CreatePrimitive(type);
-    go.name = name;
+    var go = new UnityEngine.GameObject(name);
     if (parent != null) go.transform.SetParent(parent, false);
     go.transform.localPosition = pos;
     go.transform.localScale = scale;
-    go.GetComponent<UnityEngine.Renderer>().sharedMaterial = material;
-    if (!keepCollider) UnityEngine.Object.DestroyImmediate(go.GetComponent<UnityEngine.Collider>());
+    bool cube = type == UnityEngine.PrimitiveType.Cube;
+    go.AddComponent<UnityEngine.MeshFilter>().sharedMesh = cube ? roundedCubeMesh : roundedCylinderMesh;
+    go.AddComponent<UnityEngine.MeshRenderer>().sharedMaterial = material;
+    if (keepCollider)
+    {
+        if (cube) go.AddComponent<UnityEngine.BoxCollider>();
+        else { var cc = go.AddComponent<UnityEngine.CapsuleCollider>(); cc.height = 1f; cc.radius = 0.5f; }
+    }
     return go;
 };
 System.Func<UnityEngine.GameObject, string, UnityEngine.GameObject> save = (go, name) =>
@@ -497,6 +516,36 @@ swayMover.mode = ObstacleMover.Mode.Sway;
 swayMover.swayAmount = 1.25f;
 swayMover.swaySpeed = 1.8f;
 var swayPrefab = save(swayGo, "Obstacle_Sway");
+
+// Stray dog (from level 6): trots across the whole road, must be jumped over or dodged. Built from rounded boxes
+// so it matches the game's own cartoon look; it flinches and runs off if hit (Obstacle.Kind.Critter), never gibbed.
+var furMat = mat("DogFur", new UnityEngine.Color(0.62f, 0.42f, 0.22f), 0.15f);
+var furDarkMat = mat("DogFurDark", new UnityEngine.Color(0.42f, 0.27f, 0.14f), 0.15f);
+var noseMat = mat("DogNose", new UnityEngine.Color(0.05f, 0.05f, 0.06f), 0.3f);
+var dogGo = triggerRoot("Obstacle_Dog", new UnityEngine.Vector3(0f, 0.32f, 0f), new UnityEngine.Vector3(0.9f, 0.64f, 1.5f));
+var dogVis = new UnityEngine.GameObject("Visual").transform;
+dogVis.SetParent(dogGo.transform, false);
+part(UnityEngine.PrimitiveType.Cube, "Body", dogVis, new UnityEngine.Vector3(0f, 0.36f, 0f), new UnityEngine.Vector3(0.42f, 0.36f, 0.85f), furMat, false);
+part(UnityEngine.PrimitiveType.Cube, "Head", dogVis, new UnityEngine.Vector3(0f, 0.5f, 0.58f), new UnityEngine.Vector3(0.32f, 0.3f, 0.32f), furMat, false);
+part(UnityEngine.PrimitiveType.Cube, "Snout", dogVis, new UnityEngine.Vector3(0f, 0.44f, 0.8f), new UnityEngine.Vector3(0.2f, 0.18f, 0.2f), furMat, false);
+part(UnityEngine.PrimitiveType.Cube, "Nose", dogVis, new UnityEngine.Vector3(0f, 0.44f, 0.92f), new UnityEngine.Vector3(0.1f, 0.1f, 0.06f), noseMat, false);
+foreach (float x in new[] { -0.14f, 0.14f })
+    part(UnityEngine.PrimitiveType.Cube, "Ear", dogVis, new UnityEngine.Vector3(x, 0.68f, 0.55f), new UnityEngine.Vector3(0.1f, 0.16f, 0.06f), furDarkMat, false)
+        .transform.localRotation = UnityEngine.Quaternion.Euler(0f, 0f, x < 0 ? 18f : -18f);
+foreach (float x in new[] { -0.14f, 0.14f })
+    foreach (float z in new[] { 0.28f, -0.28f })
+        part(UnityEngine.PrimitiveType.Cylinder, "Leg", dogVis, new UnityEngine.Vector3(x, 0.14f, z), new UnityEngine.Vector3(0.11f, 0.14f, 0.11f), furDarkMat, false);
+var dogTail = part(UnityEngine.PrimitiveType.Cylinder, "Tail", dogVis, new UnityEngine.Vector3(0f, 0.5f, -0.46f), new UnityEngine.Vector3(0.08f, 0.28f, 0.08f), furMat, false);
+dogTail.transform.localRotation = UnityEngine.Quaternion.Euler(55f, 0f, 0f);
+nameTag(dogGo.transform, "KÖPEK", 1f, furMat);
+var dogOb = dogGo.AddComponent<Obstacle>();
+dogOb.kind = Obstacle.Kind.Critter;
+dogOb.minLevel = 6;
+var dogMover = dogGo.AddComponent<ObstacleMover>();
+dogMover.mode = ObstacleMover.Mode.Sway;
+dogMover.swayAmount = 1.25f; // matches the swaying barrier: only crosses the two blocked lanes, never the free one
+dogMover.swaySpeed = 2.2f;
+var dogPrefab = save(dogGo, "Obstacle_Dog");
 
 // ---------- Finish: the workplace door (Kenney Platformer Kit) across all three lanes, flags on both sides ----------
 var finishGo = triggerRoot("Finish", new UnityEngine.Vector3(0f, 2f, 0f), new UnityEngine.Vector3(8f, 4f, 1f));

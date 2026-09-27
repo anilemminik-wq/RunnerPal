@@ -222,17 +222,18 @@ public static class ModularCharacterBuilder
         return root;
     }
 
+    static Mesh propMesh;
     static GameObject Prop(string name, Transform bone, Vector3 localPos, Vector3 size, Material mat)
     {
-        var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        Object.DestroyImmediate(go.GetComponent<Collider>());
-        go.name = name;
+        if (!propMesh) propMesh = ProceduralMesh.RoundedBox(Vector3.one, 0.22f, 3);
+        var go = new GameObject(name);
+        go.AddComponent<MeshFilter>().sharedMesh = propMesh;
+        go.AddComponent<MeshRenderer>().sharedMaterial = mat;
         // Bones sit under a x100 armature; props are sized in world meters.
         go.transform.SetParent(bone, false);
         float s = 1f / bone.lossyScale.x;
         go.transform.localPosition = localPos * s;
         go.transform.localScale = size * s;
-        go.GetComponent<Renderer>().sharedMaterial = mat;
         return go;
     }
 

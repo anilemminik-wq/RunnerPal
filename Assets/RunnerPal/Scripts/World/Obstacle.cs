@@ -5,8 +5,8 @@ using UnityEngine;
 public class Obstacle : MonoBehaviour
 {
     // Breakable: çarpınca parçalanır. Hole: açık rögar, içine düşülür (zıpla ya da şerit değiştir).
-    // Vehicle: araba, çarpınca savrulur.
-    public enum Kind { Breakable, Hole, Vehicle }
+    // Vehicle: araba, çarpınca savrulur. Critter: köpek gibi canlı bir engel, çarpınca ürküp kaçar.
+    public enum Kind { Breakable, Hole, Vehicle, Critter }
     public Kind kind = Kind.Breakable;
     [Tooltip("Bu engel en erken hangi bölümde çıkar")]
     public int minLevel = 1;
@@ -17,6 +17,8 @@ public class Obstacle : MonoBehaviour
     public Material debrisMaterial;
 
     bool broken;
+    // Rounded debris chunks (cartoon art pass) instead of Unity's sharp default cube, built once and reused.
+    static Mesh debrisMesh;
 
     void OnTriggerEnter(Collider other)
     {
@@ -31,6 +33,13 @@ public class Obstacle : MonoBehaviour
         broken = true;
         foreach (var c in GetComponentsInChildren<Collider>()) c.enabled = false;
         if (kind == Kind.Hole) return; // çukur yerinde kalır, düşme efektini HitFeedback yapar
+        if (kind == Kind.Critter)
+        {
+            var mover = GetComponent<ObstacleMover>();
+            if (mover) mover.enabled = false;
+            gameObject.AddComponent<CritterFlee>().awayFrom = hitFrom;
+            return;
+        }
         if (kind == Kind.Vehicle)
         {
             var mover = GetComponent<ObstacleMover>();
@@ -46,12 +55,13 @@ public class Obstacle : MonoBehaviour
         Bounds bounds = renderers.Length > 0 ? renderers[0].bounds : new Bounds(transform.position, Vector3.one);
         foreach (var r in renderers) { bounds.Encapsulate(r.bounds); r.enabled = false; }
 
+        if (!debrisMesh) debrisMesh = ProceduralMesh.RoundedBox(Vector3.one, 0.3f, 3);
         for (int i = 0; i < debrisCount; i++)
         {
-            var piece = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            Destroy(piece.GetComponent<Collider>());
-            piece.name = "Debris";
-            if (mat) piece.GetComponent<Renderer>().sharedMaterial = mat;
+            var piece = new GameObject("Debris");
+            piece.AddComponent<MeshFilter>().sharedMesh = debrisMesh;
+            var pr = piece.AddComponent<MeshRenderer>();
+            if (mat) pr.sharedMaterial = mat;
             Vector3 p = new Vector3(Random.Range(bounds.min.x, bounds.max.x), Random.Range(bounds.min.y, bounds.max.y), bounds.center.z);
             piece.transform.position = p;
             piece.transform.localScale = Vector3.one * Random.Range(0.18f, 0.35f);
@@ -60,6 +70,32 @@ public class Obstacle : MonoBehaviour
             Vector3 away = p - hitFrom; away.y = 0f;
             d.velocity = away.normalized * Random.Range(2f, 5f) + Vector3.up * Random.Range(3f, 6f) + Vector3.forward * Random.Range(4f, 9f);
         }
+    }
+}
+
+// Köpeğe çarpınca: ürküp ters yöne doğru hızla kaçar, küçülüp kaybolur (kırılmaz, sevimli kalır).
+public class CritterFlee : MonoBehaviour
+{
+    public Vector3 awayFrom;
+    float age;
+    const float Life = 0.6f;
+    Vector3 dir;
+    Vector3 startScale;
+
+    void Start()
+    {
+        Vector3 away = transform.position - awayFrom; away.y = 0f;
+        dir = (away.sqrMagnitude > 0.01f ? away.normalized : Vector3.right) + Vector3.forward * 0.6f;
+        startScale = transform.localScale;
+    }
+
+    void Update()
+    {
+        age += Time.deltaTime;
+        transform.position += dir * 9f * Time.deltaTime;
+        transform.Rotate(0f, 720f * Time.deltaTime, 0f, Space.World);
+        transform.localScale = startScale * Mathf.Clamp01(1f - age / Life);
+        if (age >= Life) Destroy(gameObject);
     }
 }
 
