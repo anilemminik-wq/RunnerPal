@@ -6,6 +6,9 @@ public class Pickup : MonoBehaviour
 {
     public enum Kind { Gold, Item, SpeedBoost, Shield, SlowTrap }
 
+    // Ses ve efektler için (ör. altın sesi).
+    public static event System.Action<Pickup> Collected;
+
     public Kind kind = Kind.Gold;
 
     [Header("Altın")]
@@ -43,6 +46,7 @@ public class Pickup : MonoBehaviour
             case Kind.SlowTrap:   player.ApplySpeedModifier(speedMultiplier, duration); break;
         }
 
+        Collected?.Invoke(this);
         if (collectEffect) Instantiate(collectEffect, transform.position, Quaternion.identity);
         gameObject.SetActive(false);
     }

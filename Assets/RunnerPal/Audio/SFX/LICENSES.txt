@@ -1,0 +1,11 @@
+RunnerPal sound effects (Assets/RunnerPal/Audio/SFX)
+
+Kenney (www.kenney.nl) - Creative Commons Zero (CC0) - no attribution required
+  coin, coin2, slide          <- RPG Audio (handleCoins, handleCoins2, cloth1)
+  item, win, fail, click      <- Interface Sounds (confirmation_002, confirmation_004, error_006, click_002)
+  powerup, shield, slowtrap   <- Digital Audio (powerUp2, phaserUp3, lowDown)
+  break1, break2, thud, jump  <- Impact Sounds (impactPlank_medium_000, impactWood_heavy_001,
+                                 impactPunch_heavy_000, footstep_concrete_002)
+
+ouch1..ouch5 - cut and loudness-normalized from "Grunts of male death and pain" (OpenGameArt.org,
+  https://opengameart.org/content/grunts-male-death-and-pain), Creative Commons Zero (CC0)

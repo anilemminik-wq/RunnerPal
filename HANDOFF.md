@@ -36,10 +36,31 @@ Last updated: 2026-09-27. Read this first, then `CLAUDE.md`, then `RUNNERPAL_TAS
   0 missing → won, all gold banked; 1 missing + 10 gold → won, paid 5; 1 missing + 1 gold → failed, nothing
   banked; 1 missing + 7 gold → won, paid 4 (half rounded up); 2 missing → failed, nothing banked.
 
+- **Characters look different:** each has its own head, skin, shorts, tank top, suit and tie colors
+  (`ModularCharacterBuilder.Look`, specs in `build_assets.cs`). Shop icons are real portraits rendered from the
+  model (`portrait` in `build_assets.cs`, renders twice because the first render after compiling can be empty).
+- **Hit feedback** (`Scripts/Feedback/HitFeedback.cs`): the obstacle shatters into debris (`Obstacle.Break`,
+  `Debris`), camera shake (`CameraFollow.Shake`), red screen flash (`HitFlash` image), lost heart pops
+  (`HeartPop`), the runner blinks while invulnerable (only while running), stumble animation; out of lives →
+  `Fall` (Death clip, set with CrossFade — a trigger lost against the same-frame Hit/stop). With a shield the
+  obstacle still shatters, with a light shake and no life lost.
+- **Sounds** (`Scripts/Feedback/RunnerAudio.cs`, clips in `Audio/SFX`, list in `Audio/SFX/LICENSES.txt`): coin
+  (random pitch), item, speed boost, shield, coffee trap, jump, slide, break + thud + random "ah!" (ouch1-5, cut
+  from a CC0 grunt recording with ffmpeg), win, fail. No music yet.
+- **City:** `build_assets.cs` makes 4 road variants per world (`Road_<World>_0..3`, TrackSpawner picks randomly):
+  sidewalks, street lamps, a front row of buildings facing the road and a bigger skyline row, from Kenney City Kit
+  Commercial (office / bank / dev) and Suburban (sales), scaled x9. Building shadows are off (phones).
+  All third-party packs: `THIRD_PARTY.md`.
+
 ## Changes to the delivered scripts
 
 - `ItemType.cs`: added `ItemNames.Get` (Turkish display names); `GameManager` fail message and `GameUI` fallback
   labels use it (was showing "Ayakkabi" instead of "Ayakkabı").
+- Feedback hooks only (rules unchanged): `PlayerController` events `Jumped`, `Slid`, `HitObstacle(obstacle,
+  damaged)` and `IsInvulnerable`; `OnHitObstacle(Obstacle)` passes the obstacle. `Pickup.Collected` static event.
+  `PlayerOutfit` gained `replaces` / `IsWearing` / `Changed`. `CameraFollow` gained `Shake`.
+- ffmpeg gotcha: put `-ss/-to` **before** `-i` when cutting clips that get fades, and don't use `loudnorm` on
+  sub-second clips (both produced pure silence).
 
 ## Next steps (ideas; ask the user)
 

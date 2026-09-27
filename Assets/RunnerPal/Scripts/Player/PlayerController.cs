@@ -150,6 +150,7 @@ public class PlayerController : MonoBehaviour
         EndSlide();
         verticalVel = Mathf.Sqrt(2f * -gravity * jumpHeight);
         anim?.SetTrigger("Jump");
+        Jumped?.Invoke();
     }
 
     void Slide()
@@ -160,6 +161,7 @@ public class PlayerController : MonoBehaviour
         col.height = colHeight * 0.5f;
         col.center = new Vector3(colCenter.x, colCenter.y - colHeight * 0.25f, colCenter.z);
         anim?.SetTrigger("Slide");
+        Slid?.Invoke();
     }
 
     void EndSlide()
@@ -188,13 +190,22 @@ public class PlayerController : MonoBehaviour
 
     public void ApplyShield(float duration) => shieldTimer = duration;
 
+    // Ses ve görsel geri bildirim için (kurallar değişmez).
+    public event System.Action Jumped;
+    public event System.Action Slid;
+    // Engel, can gitti mi (kalkanla çarpınca false).
+    public event System.Action<Obstacle, bool> HitObstacle;
+    public bool IsInvulnerable => invulnTimer > 0f;
+
     // Engel çarpınca Obstacle çağırır
-    public void OnHitObstacle()
+    public void OnHitObstacle(Obstacle obstacle = null)
     {
-        if (HasShield || invulnTimer > 0f) return;
+        if (invulnTimer > 0f) return;
+        if (HasShield) { HitObstacle?.Invoke(obstacle, false); return; }
         invulnTimer = hitInvulnerability;
         ApplySpeedModifier(hitSlowdown, 0.6f);
         anim?.SetTrigger("Hit");
+        HitObstacle?.Invoke(obstacle, true);
         GameManager.Instance.LoseLife();
     }
 }

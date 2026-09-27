@@ -114,3 +114,6 @@ InitTestScene*.unity*
 
 # Written into Assets/Resources during player builds by the performance-testing package; temporary
 /[Aa]ssets/[Rr]esources/PerformanceTestRun*
+
+# Raw downloads (zips etc.) before assets are picked into Assets/
+/Downloads/

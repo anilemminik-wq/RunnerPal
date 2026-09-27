@@ -208,7 +208,9 @@ part(UnityEngine.PrimitiveType.Cube, "Sign", finishGo.transform, new UnityEngine
 finishGo.AddComponent<FinishLine>();
 var finishPrefab = save(finishGo, "Finish");
 
-// ---------- Road segments: one set per world (20 m long, 7.5 m wide, 3 lanes of 2.5 m) ----------
+// ---------- Road segments with a city around them: 4 variants per world ----------
+// 20 m long, 3 lanes of 2.5 m (road 7.5 m wide), sidewalks, street lamps, a row of buildings facing the road and a
+// bigger skyline row behind. Buildings: Kenney City Kit Commercial / Suburban (CC0), scaled x9 (1 unit ~ 9 m).
 string[] worlds = { "Office", "Bank", "Sales", "Dev" };
 UnityEngine.Color[] groundColors =
 {
@@ -220,19 +222,123 @@ UnityEngine.Color[] fogColors =
     new UnityEngine.Color(0.72f, 0.82f, 0.92f), new UnityEngine.Color(0.9f, 0.8f, 0.66f),
     new UnityEngine.Color(0.7f, 0.88f, 0.8f), new UnityEngine.Color(0.35f, 0.38f, 0.55f),
 };
-var roadPrefabs = new UnityEngine.GameObject[4];
+// Ground beyond the sidewalks: plaza stone in town, grass in the suburbs.
+UnityEngine.Color[] landColors =
+{
+    new UnityEngine.Color(0.55f, 0.55f, 0.53f), new UnityEngine.Color(0.6f, 0.56f, 0.5f),
+    new UnityEngine.Color(0.35f, 0.55f, 0.3f), new UnityEngine.Color(0.3f, 0.3f, 0.36f),
+};
+const string commercial = "Assets/RunnerPal/ThirdParty/Kenney_CityKitCommercial/";
+const string suburban = "Assets/RunnerPal/ThirdParty/Kenney_CityKitSuburban/";
+System.Func<string, string[], UnityEngine.GameObject[]> kit = (dir, names) =>
+{
+    var list = new System.Collections.Generic.List<UnityEngine.GameObject>();
+    foreach (var n in names)
+    {
+        var g = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.GameObject>(dir + n + ".fbx");
+        if (g != null) list.Add(g);
+    }
+    return list.ToArray();
+};
+System.Func<string, char, char, string[]> range = (prefix, from, to) =>
+{
+    var l = new System.Collections.Generic.List<string>();
+    for (char c = from; c <= to; c++) l.Add(prefix + c);
+    return l.ToArray();
+};
+var shops = kit(commercial, range("building-", 'a', 'n'));
+var towers = kit(commercial, range("building-skyscraper-", 'a', 'e'));
+var farBlocks = kit(commercial, range("low-detail-building-", 'a', 'n'));
+var houses = kit(suburban, range("building-type-", 'a', 'u'));
+var trees = kit(suburban, new[] { "tree-large", "tree-small" });
+if (shops.Length == 0 || houses.Length == 0) throw new System.Exception("Kenney city kits missing under ThirdParty/");
+// Front row and skyline per world.
+UnityEngine.GameObject[][] frontSets = { shops, CombineTowers(towers, shops), houses, towers };
+UnityEngine.GameObject[][] backSets = { farBlocks, CombineTowers(towers, farBlocks), trees, farBlocks };
+UnityEngine.GameObject[] CombineTowers(UnityEngine.GameObject[] a, UnityEngine.GameObject[] b)
+{
+    var l = new System.Collections.Generic.List<UnityEngine.GameObject>(a);
+    l.AddRange(b);
+    return l.ToArray();
+}
+
+var sidewalkMat = mat("Sidewalk", new UnityEngine.Color(0.72f, 0.72f, 0.7f), 0.1f);
+var lampMat = mat("LampPost", new UnityEngine.Color(0.2f, 0.21f, 0.24f), 0.4f);
+var lampLight = glow("LampLight", new UnityEngine.Color(1f, 0.92f, 0.7f));
+
+// Places one building with its front towards the road; returns its width along the road.
+System.Func<UnityEngine.GameObject, UnityEngine.Transform, float, float, bool, float, float> placeBuilding = (src, parent, z, innerX, left, scale) =>
+{
+    var b = (UnityEngine.GameObject)UnityEditor.PrefabUtility.InstantiatePrefab(src, parent);
+    b.transform.localScale = UnityEngine.Vector3.one * scale;
+    // Kenney fronts face +Z; turn them to face the road.
+    b.transform.localRotation = UnityEngine.Quaternion.Euler(0f, left ? 90f : -90f, 0f);
+    var bounds = new UnityEngine.Bounds(b.transform.position, UnityEngine.Vector3.zero);
+    bool first = true;
+    foreach (var r in b.GetComponentsInChildren<UnityEngine.Renderer>())
+    {
+        if (first) { bounds = r.bounds; first = false; } else bounds.Encapsulate(r.bounds);
+        r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; // cheap on phones; the road keeps its shadows
+    }
+    float width = bounds.size.z, depth = bounds.size.x;
+    float x = left ? -(innerX + depth * 0.5f) : innerX + depth * 0.5f;
+    b.transform.localPosition = new UnityEngine.Vector3(x - (bounds.center.x - b.transform.position.x), 0f, z + width * 0.5f - (bounds.center.z - b.transform.position.z));
+    return width;
+};
+// Fills [0, 20) along one side with buildings from `set`, leaving small gaps.
+System.Action<UnityEngine.Transform, UnityEngine.GameObject[], bool, float, float, float, System.Random> fillSide = (parent, set, left, innerX, scale, gap, rng) =>
+{
+    float z = (float)rng.NextDouble() * 1.5f;
+    for (int guard = 0; guard < 12 && z < 19f; guard++)
+    {
+        var src = set[rng.Next(set.Length)];
+        float w = placeBuilding(src, parent, z, innerX, left, scale * (0.9f + (float)rng.NextDouble() * 0.2f));
+        if (z + w > 20.5f) { UnityEngine.Object.DestroyImmediate(parent.GetChild(parent.childCount - 1).gameObject); break; }
+        z += w + gap;
+    }
+};
+
+var roadSets = new UnityEngine.GameObject[4][];
 var skyboxes = new UnityEngine.Material[4];
 for (int w = 0; w < 4; w++)
 {
     var groundMat = mat("Road_" + worlds[w], groundColors[w], 0.15f);
-    var go = new UnityEngine.GameObject("Road_" + worlds[w]);
-    // Covers z = 0..20 from the prefab's origin (TrackSpawner places segment i at z = i * 20).
-    part(UnityEngine.PrimitiveType.Cube, "Ground", go.transform, new UnityEngine.Vector3(0f, -0.1f, 10f), new UnityEngine.Vector3(7.5f, 0.2f, 20f), groundMat, false);
-    foreach (float x in new[] { -1.25f, 1.25f })
-        part(UnityEngine.PrimitiveType.Cube, "Line", go.transform, new UnityEngine.Vector3(x, 0.005f, 10f), new UnityEngine.Vector3(0.08f, 0.01f, 20f), lineMat, false);
-    foreach (float x in new[] { -3.95f, 3.95f })
-        part(UnityEngine.PrimitiveType.Cube, "Curb", go.transform, new UnityEngine.Vector3(x, 0.1f, 10f), new UnityEngine.Vector3(0.4f, 0.4f, 20f), curbMat, false);
-    roadPrefabs[w] = save(go, "Road_" + worlds[w]);
+    var landMat = mat("Land_" + worlds[w], landColors[w], 0.05f);
+    roadSets[w] = new UnityEngine.GameObject[4];
+    for (int v = 0; v < 4; v++)
+    {
+        var rng = new System.Random(1000 * w + v);
+        var go = new UnityEngine.GameObject("Road_" + worlds[w] + "_" + v);
+        // Covers z = 0..20 from the prefab's origin (TrackSpawner places segment i at z = i * 20).
+        part(UnityEngine.PrimitiveType.Cube, "Ground", go.transform, new UnityEngine.Vector3(0f, -0.1f, 10f), new UnityEngine.Vector3(7.5f, 0.2f, 20f), groundMat, false);
+        foreach (float x in new[] { -1.25f, 1.25f })
+            part(UnityEngine.PrimitiveType.Cube, "Line", go.transform, new UnityEngine.Vector3(x, 0.005f, 10f), new UnityEngine.Vector3(0.08f, 0.01f, 20f), lineMat, false);
+        foreach (float x in new[] { -3.95f, 3.95f })
+            part(UnityEngine.PrimitiveType.Cube, "Curb", go.transform, new UnityEngine.Vector3(x, 0.1f, 10f), new UnityEngine.Vector3(0.4f, 0.4f, 20f), curbMat, false);
+        foreach (float x in new[] { -5.45f, 5.45f })
+            part(UnityEngine.PrimitiveType.Cube, "Sidewalk", go.transform, new UnityEngine.Vector3(x, 0.08f, 10f), new UnityEngine.Vector3(2.6f, 0.16f, 20f), sidewalkMat, false);
+        part(UnityEngine.PrimitiveType.Cube, "Land", go.transform, new UnityEngine.Vector3(0f, -0.25f, 10f), new UnityEngine.Vector3(140f, 0.2f, 20f), landMat, false);
+        // Street lamps on both sides, offset so they alternate.
+        foreach (var (x, z) in new[] { (-4.5f, 4f), (4.5f, 14f) })
+        {
+            part(UnityEngine.PrimitiveType.Cylinder, "LampPole", go.transform, new UnityEngine.Vector3(x, 2.2f, z), new UnityEngine.Vector3(0.12f, 2.2f, 0.12f), lampMat, false);
+            part(UnityEngine.PrimitiveType.Cube, "LampArm", go.transform, new UnityEngine.Vector3(x * 0.88f, 4.35f, z), new UnityEngine.Vector3(1.2f, 0.1f, 0.12f), lampMat, false);
+            part(UnityEngine.PrimitiveType.Cube, "LampHead", go.transform, new UnityEngine.Vector3(x * 0.76f, 4.25f, z), new UnityEngine.Vector3(0.45f, 0.14f, 0.3f), lampLight, false);
+        }
+        var front = new UnityEngine.GameObject("Front").transform;
+        front.SetParent(go.transform, false);
+        var back = new UnityEngine.GameObject("Skyline").transform;
+        back.SetParent(go.transform, false);
+        bool suburbs = w == 2;
+        foreach (bool left in new[] { true, false })
+        {
+            fillSide(front, frontSets[w], left, 7.2f, suburbs ? 7.5f : 9f, suburbs ? 3f : 0.6f, rng);
+            fillSide(back, backSets[w], left, suburbs ? 22f : 30f, suburbs ? 12f : 14f, suburbs ? 1.5f : 2f, rng);
+        }
+        roadSets[w][v] = save(go, "Road_" + worlds[w] + "_" + v);
+    }
+    // The single road prefabs from the first build are replaced by the variants.
+    UnityEditor.AssetDatabase.DeleteAsset(root + "Prefabs/Road_" + worlds[w] + ".prefab");
 
     string skyPath = root + "Materials/Sky_" + worlds[w] + ".mat";
     var sky = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.Material>(skyPath);
@@ -245,29 +351,90 @@ for (int w = 0; w < 4; w++)
     skyboxes[w] = sky;
 }
 
+// Renders a character's face into a 256 px sprite (camera in front of the head, soft key light, colored backdrop).
+System.Func<UnityEngine.GameObject, string, UnityEngine.Color, UnityEngine.Sprite> portrait = (modelPrefab, name, backdrop) =>
+{
+    const int Size = 256;
+    const int Layer = 30;
+    var active = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
+    var temp = UnityEditor.SceneManagement.EditorSceneManager.NewScene(UnityEditor.SceneManagement.NewSceneSetup.EmptyScene, UnityEditor.SceneManagement.NewSceneMode.Additive);
+    UnityEngine.SceneManagement.SceneManager.SetActiveScene(temp);
+    var m = (UnityEngine.GameObject)UnityEngine.Object.Instantiate(modelPrefab);
+    foreach (var t in m.GetComponentsInChildren<UnityEngine.Transform>(true)) t.gameObject.layer = Layer;
+    // Only the base look (outfit parts stay hidden like at the start of a run).
+    foreach (var v in m.GetComponent<PlayerOutfit>().visuals) if (v.visual) v.visual.SetActive(false);
+    var lightGo = new UnityEngine.GameObject("Key");
+    var light = lightGo.AddComponent<UnityEngine.Light>();
+    light.type = UnityEngine.LightType.Directional;
+    light.intensity = 1.3f;
+    light.cullingMask = 1 << Layer;
+    lightGo.transform.rotation = UnityEngine.Quaternion.Euler(20f, 200f, 0f);
+    var camGo = new UnityEngine.GameObject("PortraitCam");
+    var cam = camGo.AddComponent<UnityEngine.Camera>();
+    cam.cullingMask = 1 << Layer;
+    cam.clearFlags = UnityEngine.CameraClearFlags.SolidColor;
+    cam.backgroundColor = UnityEngine.Color.Lerp(backdrop, new UnityEngine.Color(0.15f, 0.18f, 0.28f), 0.55f);
+    cam.fieldOfView = 26f;
+    cam.transform.position = new UnityEngine.Vector3(0f, 1.62f, 1.9f);
+    cam.transform.LookAt(new UnityEngine.Vector3(0f, 1.56f, 0f));
+    var rt = new UnityEngine.RenderTexture(Size, Size, 24, UnityEngine.RenderTextureFormat.ARGB32);
+    rt.antiAliasing = 4;
+    cam.targetTexture = rt;
+    UnityEngine.RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
+    UnityEngine.RenderSettings.ambientLight = new UnityEngine.Color(0.55f, 0.55f, 0.6f);
+    cam.Render(); // the first render after compiling can come out empty (shaders warming up)
+    cam.Render();
+    var prev = UnityEngine.RenderTexture.active;
+    UnityEngine.RenderTexture.active = rt;
+    var tex = new UnityEngine.Texture2D(Size, Size, UnityEngine.TextureFormat.RGBA32, false);
+    tex.ReadPixels(new UnityEngine.Rect(0, 0, Size, Size), 0, 0);
+    // Round badge: clear the corners.
+    var px = tex.GetPixels32();
+    for (int y = 0; y < Size; y++)
+        for (int x = 0; x < Size; x++)
+        {
+            float dx = (x + 0.5f) / Size * 2f - 1f, dy = (y + 0.5f) / Size * 2f - 1f;
+            float a = UnityEngine.Mathf.Clamp01((0.97f - UnityEngine.Mathf.Sqrt(dx * dx + dy * dy)) * Size * 0.5f);
+            var c = px[y * Size + x];
+            c.a = (byte)(a * 255);
+            px[y * Size + x] = c;
+        }
+    tex.SetPixels32(px);
+    tex.Apply();
+    UnityEngine.RenderTexture.active = prev;
+    cam.targetTexture = null;
+    rt.Release();
+    string path = root + "Sprites/" + name + ".png";
+    System.IO.File.WriteAllBytes(path, UnityEngine.ImageConversion.EncodeToPNG(tex));
+    UnityEngine.Object.DestroyImmediate(tex);
+    UnityEngine.SceneManagement.SceneManager.SetActiveScene(active);
+    UnityEditor.SceneManagement.EditorSceneManager.CloseScene(temp, true);
+    UnityEditor.AssetDatabase.ImportAsset(path);
+    var imp = (UnityEditor.TextureImporter)UnityEditor.AssetImporter.GetAtPath(path);
+    imp.textureType = UnityEditor.TextureImporterType.Sprite;
+    imp.mipmapEnabled = false;
+    imp.alphaIsTransparency = true;
+    imp.SaveAndReimport();
+    return UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.Sprite>(path);
+};
+
 // ---------- Characters: Quaternius modular men (CC0), assembled by Editor/ModularCharacterBuilder ----------
 // Shop characters: the default look is free; the others cost gold. Each gets its own head and skin tone.
 var runnerController = ModularCharacterBuilder.BuildController();
 var characterSpecs = new[]
 {
-    new { id = "default", display = "Mehmet Bey", price = 0, head = "Suit_Head", skin = new UnityEngine.Color(0.93f, 0.74f, 0.6f), hair = new UnityEngine.Color(0.2f, 0.13f, 0.08f) },
-    new { id = "kemal", display = "Kemal Abi", price = 150, head = "Worker_Head", skin = new UnityEngine.Color(0.76f, 0.55f, 0.4f), hair = new UnityEngine.Color(0.08f, 0.08f, 0.08f) },
-    new { id = "burak", display = "Burak", price = 300, head = "Casual_Head", skin = new UnityEngine.Color(0.96f, 0.8f, 0.68f), hair = new UnityEngine.Color(0.85f, 0.62f, 0.25f) },
-    new { id = "hasan", display = "Hasan Usta", price = 500, head = "Farmer_Head", skin = new UnityEngine.Color(0.6f, 0.42f, 0.3f), hair = new UnityEngine.Color(0.75f, 0.75f, 0.75f) },
+    new { id = "default", display = "Mehmet Bey", price = 0, head = "Suit_Head", skin = new UnityEngine.Color(0.93f, 0.74f, 0.6f), hair = new UnityEngine.Color(0.2f, 0.13f, 0.08f), shorts = new UnityEngine.Color(0.72f, 0.12f, 0.16f), tank = new UnityEngine.Color(0.97f, 0.97f, 0.97f), suit = new UnityEngine.Color(0.13f, 0.15f, 0.18f), tie = new UnityEngine.Color(0.25f, 0.3f, 0.38f) },
+    new { id = "kemal", display = "Kemal Abi", price = 150, head = "Worker_Head", skin = new UnityEngine.Color(0.76f, 0.55f, 0.4f), hair = new UnityEngine.Color(0.08f, 0.08f, 0.08f), shorts = new UnityEngine.Color(0.15f, 0.32f, 0.75f), tank = new UnityEngine.Color(0.68f, 0.7f, 0.72f), suit = new UnityEngine.Color(0.1f, 0.14f, 0.32f), tie = new UnityEngine.Color(0.75f, 0.1f, 0.12f) },
+    new { id = "burak", display = "Burak", price = 300, head = "Casual_Head", skin = new UnityEngine.Color(0.96f, 0.8f, 0.68f), hair = new UnityEngine.Color(0.85f, 0.62f, 0.25f), shorts = new UnityEngine.Color(0.2f, 0.62f, 0.3f), tank = new UnityEngine.Color(0.98f, 0.85f, 0.3f), suit = new UnityEngine.Color(0.56f, 0.58f, 0.62f), tie = new UnityEngine.Color(0.9f, 0.42f, 0.62f) },
+    new { id = "hasan", display = "Hasan Usta", price = 500, head = "Farmer_Head", skin = new UnityEngine.Color(0.6f, 0.42f, 0.3f), hair = new UnityEngine.Color(0.75f, 0.75f, 0.75f), shorts = new UnityEngine.Color(0.92f, 0.46f, 0.1f), tank = new UnityEngine.Color(0.86f, 0.8f, 0.66f), suit = new UnityEngine.Color(0.36f, 0.22f, 0.12f), tie = new UnityEngine.Color(0.1f, 0.45f, 0.22f) },
 };
 var characterAssets = new System.Collections.Generic.List<UnityEngine.Object>();
 foreach (var spec in characterSpecs)
 {
-    var modelPrefab = ModularCharacterBuilder.Build(spec.id, spec.head, spec.skin, runnerController);
-    var icon = sprite("Char_" + spec.id, 128, (x, y) =>
-    {
-        // Simple portrait: hair cap over a skin-colored face in a round badge.
-        float r = UnityEngine.Mathf.Sqrt(x * x + y * y);
-        float face = UnityEngine.Mathf.Sqrt(x * x + (y + 0.05f) * (y + 0.05f));
-        UnityEngine.Color col = new UnityEngine.Color(0.2f, 0.25f, 0.35f);
-        if (face < 0.55f) col = y > 0.25f && face > 0.3f ? spec.hair : spec.skin;
-        return new UnityEngine.Color(col.r, col.g, col.b, aa(r - 0.95f));
-    });
+    var modelPrefab = ModularCharacterBuilder.Build(spec.id, spec.head,
+        new ModularCharacterBuilder.Look { skin = spec.skin, shorts = spec.shorts, tankTop = spec.tank, suit = spec.suit, tie = spec.tie }, runnerController);
+    // Portrait for the shop: the real model (head + tank top), rendered in a temporary scene.
+    var icon = portrait(modelPrefab, "Char_" + spec.id, spec.tank);
     string path = root + "Characters/Character_" + spec.id + ".asset";
     var data = UnityEditor.AssetDatabase.LoadAssetAtPath<CharacterData>(path);
     if (data == null) { data = UnityEngine.ScriptableObject.CreateInstance<CharacterData>(); UnityEditor.AssetDatabase.CreateAsset(data, path); }
@@ -286,7 +453,7 @@ for (int n = 1; n <= 40; n++)
     var level = UnityEditor.AssetDatabase.LoadAssetAtPath<LevelData>(root + "Levels/Level_" + n.ToString("00") + ".asset");
     if (level == null) continue;
     int w = (n - 1) / 10;
-    level.roadSegmentPrefabs = new[] { roadPrefabs[w] };
+    level.roadSegmentPrefabs = roadSets[w];
     level.skyboxMaterial = skyboxes[w];
     level.fogColor = fogColors[w];
     UnityEditor.EditorUtility.SetDirty(level);

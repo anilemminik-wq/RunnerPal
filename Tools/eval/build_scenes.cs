@@ -293,6 +293,37 @@ winCard.parent.gameObject.SetActive(false);
 failCard.parent.gameObject.SetActive(false);
 
 UnityEditor.EditorUtility.SetDirty(ui);
+
+// ---------- Hit feedback + sounds ----------
+// Red flash over the whole screen (under the panels, above the HUD) when a life is lost.
+var flash = stretch("HitFlash", cv);
+flash.SetSiblingIndex(hud.GetSiblingIndex() + 1);
+var flashImg = flash.gameObject.AddComponent<UnityEngine.UI.Image>();
+flashImg.color = new UnityEngine.Color(0.9f, 0.05f, 0.05f, 0f);
+flashImg.raycastTarget = false;
+var feedback = gmGo.AddComponent<HitFeedback>();
+feedback.player = controller;
+feedback.cameraFollow = follow;
+feedback.flash = flashImg;
+feedback.hearts = hearts;
+
+System.Func<string, UnityEngine.AudioClip> sfx = n => UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.AudioClip>(root + "Audio/SFX/" + n);
+var audioGo = new UnityEngine.GameObject("RunnerAudio");
+var runnerAudio = audioGo.AddComponent<RunnerAudio>();
+runnerAudio.player = controller;
+runnerAudio.coin = new[] { sfx("coin.ogg"), sfx("coin2.ogg") };
+runnerAudio.item = sfx("item.ogg");
+runnerAudio.powerUp = sfx("powerup.ogg");
+runnerAudio.shield = sfx("shield.ogg");
+runnerAudio.slowTrap = sfx("slowtrap.ogg");
+runnerAudio.jump = sfx("jump.ogg");
+runnerAudio.slide = sfx("slide.ogg");
+runnerAudio.win = sfx("win.ogg");
+runnerAudio.fail = sfx("fail.ogg");
+runnerAudio.breakObstacle = new[] { sfx("break1.ogg"), sfx("break2.ogg") };
+runnerAudio.thud = sfx("thud.ogg");
+runnerAudio.ouch = new[] { sfx("ouch1.wav"), sfx("ouch2.wav"), sfx("ouch3.wav"), sfx("ouch4.wav"), sfx("ouch5.wav") };
+if (runnerAudio.ouch[0] == null || runnerAudio.coin[0] == null) throw new System.Exception("sounds missing in Audio/SFX");
 string gamePath = root + "Scenes/Game.unity";
 UnityEditor.SceneManagement.EditorSceneManager.SaveScene(game, gamePath);
 

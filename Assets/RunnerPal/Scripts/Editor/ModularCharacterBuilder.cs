@@ -76,6 +76,7 @@ public static class ModularCharacterBuilder
         var idle = Clip("Idle");
         var roll = Clip("Roll");
         var hit = Clip("HitRecieve");
+        var death = Clip("Death");
         var jump = MakeJumpPose(run);
 
         string path = AnimDir + "Runner.controller";
@@ -87,6 +88,8 @@ public static class ModularCharacterBuilder
         ctrl.AddParameter("Jump", AnimatorControllerParameterType.Trigger);
         ctrl.AddParameter("Slide", AnimatorControllerParameterType.Trigger);
         ctrl.AddParameter("Hit", AnimatorControllerParameterType.Trigger);
+        // HitFeedback: out of lives -> the runner falls down and stays down.
+        ctrl.AddParameter("Fall", AnimatorControllerParameterType.Trigger);
 
         var sm = ctrl.layers[0].stateMachine;
         var sIdle = sm.AddState("Idle"); sIdle.motion = idle;
@@ -95,6 +98,12 @@ public static class ModularCharacterBuilder
         var sSlide = sm.AddState("Slide"); sSlide.motion = roll;
         sSlide.speed = roll.length / 0.7f; // PlayerController.slideDuration
         var sHit = sm.AddState("Hit"); sHit.motion = hit;
+        var sFall = sm.AddState("Fall"); sFall.motion = death;
+        var toFall = sm.AddAnyStateTransition(sFall);
+        toFall.AddCondition(AnimatorConditionMode.If, 0, "Fall");
+        toFall.duration = 0.1f;
+        toFall.hasExitTime = false;
+        toFall.canTransitionToSelf = false;
         sm.defaultState = sIdle;
 
         var toRun = sIdle.AddTransition(sRun); toRun.AddCondition(AnimatorConditionMode.If, 0, "Running"); toRun.duration = 0.15f; toRun.hasExitTime = false;
@@ -168,14 +177,23 @@ public static class ModularCharacterBuilder
         System.Array.FindIndex(smr.sharedMaterials, m => m != null && m.name == materialName);
 
     // id: character id; head: part name of its head (e.g. "Suit_Head"); skin: skin tone.
-    public static GameObject Build(string id, string head, Color skin, AnimatorController controller)
+    // Colors that make each shop character look different (the outfit rules stay the same).
+    public struct Look
+    {
+        public Color skin, shorts, tankTop, suit, tie;
+    }
+
+    public static GameObject Build(string id, string head, Look look, AnimatorController controller)
     {
         var smrs = new Dictionary<string, SkinnedMeshRenderer>();
         var go = Assemble("Model_" + id, new[] { "Beach_Body", "Beach_Legs", "Beach_Feet", head, "Suit_Body", "Suit_Legs", "Suit_Feet" }, smrs);
 
         // Skin tone on every "Skin" slot; tank top = white instead of the beach shirt's color.
-        var skinMat = Lit("CharSkin_" + id, skin, 0.2f);
-        var tank = Lit("CharTankTop", new Color(0.96f, 0.96f, 0.96f), 0.1f);
+        var skinMat = Lit("CharSkin_" + id, look.skin, 0.2f);
+        var shortsMat = Lit("CharShorts_" + id, look.shorts, 0.15f);
+        var suitMat = Lit("CharSuit_" + id, look.suit, 0.3f);
+        var tieMat = Lit("CharTie_" + id, look.tie, 0.4f);
+        var tank = Lit("CharTankTop_" + id, look.tankTop, 0.1f);
         foreach (var smr in smrs.Values)
         {
             var mats = smr.sharedMaterials;
@@ -184,6 +202,9 @@ public static class ModularCharacterBuilder
                 if (mats[i] == null) continue;
                 if (mats[i].name == "Skin") mats[i] = skinMat;
                 else if (smr.name == "Beach_Body" && mats[i].name == "LightBrown") mats[i] = tank;
+                else if (mats[i].name == "Red_Dark") mats[i] = shortsMat; // shorts and flip-flop straps
+                else if (mats[i].name == "Suit") mats[i] = suitMat;
+                else if (mats[i].name == "Tie") mats[i] = tieMat;
             }
             smr.sharedMaterials = mats;
         }
@@ -220,9 +241,9 @@ public static class ModularCharacterBuilder
         var torso = suit.gameObject.AddComponent<SuitTorso>();
         var suitMats = suit.sharedMaterials;
         torso.outfit = outfit;
-        torso.jacketSlot = Slot(suit, "Suit");
+        torso.jacketSlot = Slot(suit, suitMat.name);
         torso.shirtSlot = Slot(suit, "White");
-        torso.tieSlot = Slot(suit, "Tie");
+        torso.tieSlot = Slot(suit, tieMat.name);
         torso.jacket = suitMats[torso.jacketSlot];
         torso.shirt = suitMats[torso.shirtSlot];
         torso.tie = suitMats[torso.tieSlot];

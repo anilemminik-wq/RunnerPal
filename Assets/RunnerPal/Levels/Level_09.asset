@@ -48,6 +48,9 @@ MonoBehaviour:
   powerUpChance: 0.08
   slowTrapChance: 0.086
   roadSegmentPrefabs:
-  - {fileID: 3572385081448963754, guid: 0d48a8852ab4abe4b9b9bcd82a5d466d, type: 3}
+  - {fileID: 6264010524937340143, guid: 4c55e25974a83964e9cdd8a2c57562cb, type: 3}
+  - {fileID: 1819639054644090478, guid: 9f34250f5107d974e83adda11aec08a8, type: 3}
+  - {fileID: 4362534214520597682, guid: 6f58feca90ebd32459934f34e2458e74, type: 3}
+  - {fileID: 5387345230226288208, guid: 7555c8be9182ae2459b8ca1a51f38fd4, type: 3}
   skyboxMaterial: {fileID: 2100000, guid: aa8d14d81346c0a429bc07a7ff99b450, type: 2}
   fogColor: {r: 0.72, g: 0.82, b: 0.92, a: 1}
