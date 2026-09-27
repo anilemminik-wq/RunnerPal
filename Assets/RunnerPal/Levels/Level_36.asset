@@ -1,0 +1,53 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a917886d1c3fde4478d68f5622fb5522, type: 3}
+  m_Name: Level_36
+  m_EditorClassIdentifier: Assembly-CSharp::LevelData
+  levelNumber: 36
+  jobName: "Yaz\u0131l\u0131mc\u0131"
+  requiredItems: 00000000010000000200000003000000040000000500000006000000
+  levelLength: 890
+  timeLimit: 52
+  startSpeed: 17
+  maxSpeed: 29.5
+  speedCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 1
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 1
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  obstacleChance: 0.71
+  goldChance: 0.6
+  powerUpChance: 0.08
+  slowTrapChance: 0.194
+  roadSegmentPrefabs:
+  - {fileID: 8734868074918359387, guid: 81230d6c156b2f24d85672fab4e260b5, type: 3}
+  skyboxMaterial: {fileID: 2100000, guid: 9e25ef4902fec9b46909c2b69aa17257, type: 2}
+  fogColor: {r: 0.35, g: 0.38, b: 0.55, a: 1}

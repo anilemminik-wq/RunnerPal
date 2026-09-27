@@ -1,0 +1,52 @@
+# RunnerPal
+
+**New session? Read `HANDOFF.md` first.** The game spec is `RUNNERPAL_TASK.md` (rules, architecture, original
+scripts) and `README.md` (setup guide). Both were written in Claude on the web for this project.
+
+3-lane runner for Android (Google Play), portrait. A man late for work runs from home in underwear and a tank top,
+collects the outfit his job needs from the road, gold, and power-ups, and dodges obstacles. 40 levels in 4 worlds
+(jobs): 1-10 Ofis Çalışanı (shirt, pants, jacket, shoes), 11-20 Banka Memuru (+ watch), 21-30 Satış Temsilcisi
+(+ phone), 31-40 Yazılımcı (+ laptop).
+
+## Rules (from RUNNERPAL_TASK.md — implement exactly, do not change)
+
+- Swipe left/right = change lane, up = jump, down = slide. Editor: arrows / WASD.
+- Speed rises within a level and every level starts faster than the previous one.
+- 3 lives; hitting an obstacle costs one and gives short invulnerability. No lives left = level failed.
+- Power-ups: speed boost (timed), shield (no life loss while active). Slow-down is a trap (spilled coffee).
+- Every level has a time limit; not reaching the finish in time = failed.
+- The required outfit is shown before the run starts.
+- At the finish: 0 missing = pass; 1 missing = pay 50% of the level's gold for it and pass (0 or 1 gold = fail);
+  2+ missing = game over. Gold from a failed level is not banked.
+- Main menu shop: buy and select characters with banked gold.
+
+## Tech
+
+- Unity 6000.3.25f1 (6.3 LTS), URP (3D URP template), Android only, portrait, IL2CPP ARM64, min API 25.
+- Package `com.anilemminik.runnerpal`, company "Emminik Games", product "RunnerPal".
+- Input: **Active Input Handling = Both** (the spec's scripts use the legacy `Input` class). UI uses the
+  Input System UI module. Changing this setting opens a restart dialog that freezes the Editor for the CLI:
+  change it in `ProjectSettings.asset` with the Editor closed.
+- UI: uGUI + TextMeshPro. Scripts have no namespace and live in Assembly-CSharp (as in the spec).
+
+## Conventions
+
+- Scenes, prefabs and generated assets are built by eval scripts in `Tools/eval/` (not by hand-editing YAML):
+  `setup_fonts.cs` → `build_assets.cs` → `build_scenes.cs`. Rerun them after changing them.
+- Placeholder art = primitives (cubes, cylinders, capsules) until real models arrive. Character models are
+  prefabs in `Assets/RunnerPal/Models` with a `PlayerOutfit` whose outfit parts start hidden.
+- Every `.cs` / asset is committed with its `.meta`. Git LFS tracks png/jpg/psd/wav/mp3/ogg/fbx/blend.
+- Third-party content: only CC0 / permissive licenses, never images from the web. TMP's EmojiOne samples were
+  removed on purpose (attribution license, unused).
+- Turkish letters render from `LiberationSans SDF - Fallback`, which must stay baked and never cleared on build
+  (`setup_fonts.cs`), or ı / ş / ğ show blank on the phone.
+- Player-facing item names come from `ItemNames.Get` (Turkish); enum names stay ASCII.
+
+## Tooling
+
+- Drive the Editor with the Unity CLI from the project folder (`cd C:\oyunyapimi\RunnerPall && unity command ...`);
+  the shell's default folder is DirectBall, so always `cd` first or the command goes to the wrong project.
+- `unity command eval` often reports "Main thread operation timed out after 5000ms" while the work still finishes;
+  check the result before rerunning.
+- Play-mode tests write PlayerPrefs (`rp_*`); clear them afterwards (`PlayerPrefs.DeleteAll()`) until the user has
+  real progress to protect — then back up and restore instead.

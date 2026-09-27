@@ -1,0 +1,53 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a917886d1c3fde4478d68f5622fb5522, type: 3}
+  m_Name: Level_19
+  m_EditorClassIdentifier: Assembly-CSharp::LevelData
+  levelNumber: 19
+  jobName: Banka Memuru
+  requiredItems: 0000000001000000020000000300000004000000
+  levelLength: 820
+  timeLimit: 60
+  startSpeed: 13.6
+  maxSpeed: 23.1
+  speedCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 1
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 1
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  obstacleChance: 0.53999996
+  goldChance: 0.6
+  powerUpChance: 0.08
+  slowTrapChance: 0.126
+  roadSegmentPrefabs:
+  - {fileID: 5718151226216725159, guid: 221d0b9946f8f934997abcdf96e724c8, type: 3}
+  skyboxMaterial: {fileID: 2100000, guid: 40071f1ffe6d6c045abdc9351358af62, type: 2}
+  fogColor: {r: 0.9, g: 0.8, b: 0.66, a: 1}
