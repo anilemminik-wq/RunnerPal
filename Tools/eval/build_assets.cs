@@ -55,7 +55,6 @@ var postMat = mat("Post", new UnityEngine.Color(0.25f, 0.25f, 0.28f), 0.2f);
 var lineMat = mat("LaneLine", new UnityEngine.Color(0.95f, 0.95f, 0.9f), 0.1f);
 var curbMat = mat("Curb", new UnityEngine.Color(0.6f, 0.6f, 0.62f), 0.1f);
 var doorMat = mat("Door", new UnityEngine.Color(0.2f, 0.55f, 0.35f), 0.4f);
-var skinMat = mat("Skin", new UnityEngine.Color(0.93f, 0.74f, 0.6f), 0.2f);
 
 // ---------- Sprites (generated textures) ----------
 System.Func<string, int, System.Func<float, float, UnityEngine.Color>, UnityEngine.Sprite> sprite = (name, size, paint) =>
@@ -246,76 +245,20 @@ for (int w = 0; w < 4; w++)
     skyboxes[w] = sky;
 }
 
-// ---------- Character models: underwear + tank top body with hidden outfit parts (PlayerOutfit) ----------
-// Pivot at the feet; the body spans 0..2 m like the player's capsule.
-System.Func<string, UnityEngine.Color, UnityEngine.Color, UnityEngine.GameObject> model = (name, skin, hair) =>
-{
-    var skinM = mat("Skin_" + name, skin, 0.2f);
-    var hairM = mat("Hair_" + name, hair, 0.3f);
-    var go = new UnityEngine.GameObject("Model_" + name);
-    var t = go.transform;
-    var white = mat("TankTop", new UnityEngine.Color(0.97f, 0.97f, 0.97f), 0.1f);
-    var shorts = mat("Underwear", new UnityEngine.Color(0.85f, 0.35f, 0.4f), 0.1f);
-    // Body
-    part(UnityEngine.PrimitiveType.Sphere, "Head", t, new UnityEngine.Vector3(0f, 1.72f, 0f), new UnityEngine.Vector3(0.42f, 0.46f, 0.42f), skinM, false);
-    part(UnityEngine.PrimitiveType.Sphere, "Hair", t, new UnityEngine.Vector3(0f, 1.86f, -0.03f), new UnityEngine.Vector3(0.44f, 0.25f, 0.44f), hairM, false);
-    part(UnityEngine.PrimitiveType.Cube, "TankTop", t, new UnityEngine.Vector3(0f, 1.2f, 0f), new UnityEngine.Vector3(0.55f, 0.6f, 0.3f), white, false);
-    part(UnityEngine.PrimitiveType.Cube, "Underwear", t, new UnityEngine.Vector3(0f, 0.85f, 0f), new UnityEngine.Vector3(0.52f, 0.2f, 0.3f), shorts, false);
-    foreach (float x in new[] { -0.14f, 0.14f })
-        part(UnityEngine.PrimitiveType.Cube, "Leg", t, new UnityEngine.Vector3(x, 0.4f, 0f), new UnityEngine.Vector3(0.18f, 0.72f, 0.2f), skinM, false);
-    foreach (float x in new[] { -0.38f, 0.38f })
-        part(UnityEngine.PrimitiveType.Cube, "Arm", t, new UnityEngine.Vector3(x, 1.15f, 0f), new UnityEngine.Vector3(0.14f, 0.62f, 0.16f), skinM, false);
-
-    // Outfit parts (hidden at start; PlayerOutfit shows them as they're collected)
-    var outfit = go.AddComponent<PlayerOutfit>();
-    var visuals = new System.Collections.Generic.List<PlayerOutfit.ItemVisual>();
-    System.Func<ItemType, string, UnityEngine.GameObject> group = (item, groupName) =>
-    {
-        var g = new UnityEngine.GameObject(groupName);
-        g.transform.SetParent(t, false);
-        visuals.Add(new PlayerOutfit.ItemVisual { item = item, visual = g });
-        return g;
-    };
-    var shirt = group(ItemType.Gomlek, "Outfit_Gomlek");
-    part(UnityEngine.PrimitiveType.Cube, "Shirt", shirt.transform, new UnityEngine.Vector3(0f, 1.2f, 0f), new UnityEngine.Vector3(0.58f, 0.63f, 0.33f), itemMats[ItemType.Gomlek], false);
-    foreach (float x in new[] { -0.38f, 0.38f })
-        part(UnityEngine.PrimitiveType.Cube, "Sleeve", shirt.transform, new UnityEngine.Vector3(x, 1.28f, 0f), new UnityEngine.Vector3(0.17f, 0.45f, 0.19f), itemMats[ItemType.Gomlek], false);
-    var pants = group(ItemType.Pantolon, "Outfit_Pantolon");
-    part(UnityEngine.PrimitiveType.Cube, "Waist", pants.transform, new UnityEngine.Vector3(0f, 0.85f, 0f), new UnityEngine.Vector3(0.55f, 0.23f, 0.33f), itemMats[ItemType.Pantolon], false);
-    foreach (float x in new[] { -0.14f, 0.14f })
-        part(UnityEngine.PrimitiveType.Cube, "PantLeg", pants.transform, new UnityEngine.Vector3(x, 0.42f, 0f), new UnityEngine.Vector3(0.21f, 0.7f, 0.23f), itemMats[ItemType.Pantolon], false);
-    var jacket = group(ItemType.Ceket, "Outfit_Ceket");
-    part(UnityEngine.PrimitiveType.Cube, "Jacket", jacket.transform, new UnityEngine.Vector3(0f, 1.18f, -0.01f), new UnityEngine.Vector3(0.62f, 0.68f, 0.36f), itemMats[ItemType.Ceket], false);
-    foreach (float x in new[] { -0.39f, 0.39f })
-        part(UnityEngine.PrimitiveType.Cube, "JacketSleeve", jacket.transform, new UnityEngine.Vector3(x, 1.15f, 0f), new UnityEngine.Vector3(0.19f, 0.64f, 0.21f), itemMats[ItemType.Ceket], false);
-    var shoes = group(ItemType.Ayakkabi, "Outfit_Ayakkabi");
-    foreach (float x in new[] { -0.14f, 0.14f })
-        part(UnityEngine.PrimitiveType.Cube, "Shoe", shoes.transform, new UnityEngine.Vector3(x, 0.06f, 0.05f), new UnityEngine.Vector3(0.22f, 0.12f, 0.34f), itemMats[ItemType.Ayakkabi], false);
-    var watch = group(ItemType.Saat, "Outfit_Saat");
-    part(UnityEngine.PrimitiveType.Cube, "Watch", watch.transform, new UnityEngine.Vector3(-0.38f, 0.9f, 0f), new UnityEngine.Vector3(0.18f, 0.07f, 0.2f), itemMats[ItemType.Saat], false);
-    var phone = group(ItemType.Telefon, "Outfit_Telefon");
-    part(UnityEngine.PrimitiveType.Cube, "Phone", phone.transform, new UnityEngine.Vector3(0.4f, 0.85f, 0.1f), new UnityEngine.Vector3(0.08f, 0.2f, 0.12f), itemMats[ItemType.Telefon], false);
-    var laptop = group(ItemType.Laptop, "Outfit_Laptop");
-    part(UnityEngine.PrimitiveType.Cube, "Laptop", laptop.transform, new UnityEngine.Vector3(-0.47f, 1.0f, 0f), new UnityEngine.Vector3(0.05f, 0.35f, 0.5f), itemMats[ItemType.Laptop], false);
-    outfit.visuals = visuals.ToArray();
-    // Model files live in Models/ (they are character looks, not level pieces).
-    var prefab = UnityEditor.PrefabUtility.SaveAsPrefabAsset(go, root + "Models/Model_" + name + ".prefab");
-    UnityEngine.Object.DestroyImmediate(go);
-    return prefab;
-};
-
-// Shop characters: the default look is free; the others cost gold.
+// ---------- Characters: Quaternius modular men (CC0), assembled by Editor/ModularCharacterBuilder ----------
+// Shop characters: the default look is free; the others cost gold. Each gets its own head and skin tone.
+var runnerController = ModularCharacterBuilder.BuildController();
 var characterSpecs = new[]
 {
-    new { id = "default", display = "Mehmet Bey", price = 0, skin = new UnityEngine.Color(0.93f, 0.74f, 0.6f), hair = new UnityEngine.Color(0.2f, 0.13f, 0.08f) },
-    new { id = "kemal", display = "Kemal Abi", price = 150, skin = new UnityEngine.Color(0.76f, 0.55f, 0.4f), hair = new UnityEngine.Color(0.08f, 0.08f, 0.08f) },
-    new { id = "burak", display = "Burak", price = 300, skin = new UnityEngine.Color(0.96f, 0.8f, 0.68f), hair = new UnityEngine.Color(0.85f, 0.62f, 0.25f) },
-    new { id = "hasan", display = "Hasan Usta", price = 500, skin = new UnityEngine.Color(0.6f, 0.42f, 0.3f), hair = new UnityEngine.Color(0.75f, 0.75f, 0.75f) },
+    new { id = "default", display = "Mehmet Bey", price = 0, head = "Suit_Head", skin = new UnityEngine.Color(0.93f, 0.74f, 0.6f), hair = new UnityEngine.Color(0.2f, 0.13f, 0.08f) },
+    new { id = "kemal", display = "Kemal Abi", price = 150, head = "Worker_Head", skin = new UnityEngine.Color(0.76f, 0.55f, 0.4f), hair = new UnityEngine.Color(0.08f, 0.08f, 0.08f) },
+    new { id = "burak", display = "Burak", price = 300, head = "Casual_Head", skin = new UnityEngine.Color(0.96f, 0.8f, 0.68f), hair = new UnityEngine.Color(0.85f, 0.62f, 0.25f) },
+    new { id = "hasan", display = "Hasan Usta", price = 500, head = "Farmer_Head", skin = new UnityEngine.Color(0.6f, 0.42f, 0.3f), hair = new UnityEngine.Color(0.75f, 0.75f, 0.75f) },
 };
 var characterAssets = new System.Collections.Generic.List<UnityEngine.Object>();
 foreach (var spec in characterSpecs)
 {
-    var modelPrefab = model(spec.id, spec.skin, spec.hair);
+    var modelPrefab = ModularCharacterBuilder.Build(spec.id, spec.head, spec.skin, runnerController);
     var icon = sprite("Char_" + spec.id, 128, (x, y) =>
     {
         // Simple portrait: hair cap over a skin-colored face in a round badge.

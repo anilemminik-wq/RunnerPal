@@ -15,8 +15,20 @@ Last updated: 2026-09-27. Read this first, then `CLAUDE.md`, then `RUNNERPAL_TAS
 - Placeholder prefabs in `Assets/RunnerPal/Prefabs`: Gold, Item_<7 items> (colored cube + gold halo), SpeedBoost,
   Shield, SlowTrap (coffee puddle), Obstacle_Low (0.8 m, jump it), Obstacle_High (bar 1.3-2.3 m, slide under),
   Finish (office door), roads (20 m x 7.5 m, 3 lanes of 2.5 m). UI prefabs: RequiredIcon, ShopCard.
-- Characters: 4 `CharacterData` (default Mehmet Bey 0, Kemal Abi 150, Burak 300, Hasan Usta 500) with primitive
-  models in `Models/` (underwear + tank top; hidden outfit parts shown by `PlayerOutfit`).
+- Characters: 4 `CharacterData` (default Mehmet Bey 0, Kemal Abi 150, Burak 300, Hasan Usta 500). Models are
+  **Quaternius "Ultimate Modular Men" (CC0)** parts in `ThirdParty/Quaternius_UltimateModularMen/`, assembled by
+  `Scripts/Editor/ModularCharacterBuilder.cs` onto one armature:
+  - base look: Beach_Body (recolored into a white tank top) + Beach_Legs (red shorts = "don") + Beach_Feet
+    (barefoot/flip-flops); heads: Suit (Mehmet), Worker (Kemal), Casual (Burak), Farmer (Hasan), own skin tone each.
+  - outfit: Suit_Legs = Pantolon, Suit_Feet = Ayakkabı (each hides the Beach part under it), Suit_Body = Gömlek +
+    Ceket (`SuitTorso` recolors its slots: shirt only → white long-sleeve; jacket only → jacket on bare chest;
+    both → full suit). Saat / Telefon / Laptop = small props on the wrist bones.
+  - Animator `Animation/Runner.controller` (on `CharacterArmature`): Idle, Run, Slide = Roll clip sped up to
+    0.7 s, Hit = HitRecieve, Jump = a held mid-stride Run frame (`Animation/Jump.anim`; the pack has no jump).
+  - Download source: Google Drive folder `1USAAquX2JJWuA2m6zol0KUkFe3UkZ8zX` (from the pack page). Public Drive
+    folders list without login via `https://drive.google.com/embeddedfolderview?id=<folder>`; files download via
+    `https://drive.usercontent.google.com/download?id=<file>&export=download&confirm=t`. We took the "Separate
+    Skeletal Meshes and Animations" parts (Suit, Beach, Casual, Casual2, Worker, Punk, Farmer) + `Animations.fbx`.
 - Scenes: `Scenes/MainMenu` (gold chip, character shop, OYNA) and `Scenes/Game` (player, camera, GameManager with
   the 40 levels, TrackSpawner, GameUI: briefing / HUD / win / fail). Build order MainMenu, Game.
 - Verified in Play mode: briefing shows the job, time and outfit list; a real run moves, collects gold, loses a
@@ -31,8 +43,9 @@ Last updated: 2026-09-27. Read this first, then `CLAUDE.md`, then `RUNNERPAL_TAS
 
 ## Next steps (ideas; ask the user)
 
-1. Real art: character model + run/jump/slide animations (Animator params: Running, Speed, Jump, Slide, Hit),
-   themed road pieces and props per world. Keep licenses CC0 / owned.
+1. Art: character done (see above). Still placeholder: road pieces, props per world, pickups, obstacles, finish
+   door. Quaternius has CC0 city/office packs that could fit; keep licenses CC0 / owned. A real jump animation
+   (e.g. Quaternius Universal Animation Library, needs a humanoid setup) would beat the held pose.
 2. Feel: sounds and music, collect/hit effects, camera shake, UI polish (DirectBall got a "neon frame" look —
    RunnerPal may want its own style).
 3. Device test (touch swipes, performance; object pooling if needed).
