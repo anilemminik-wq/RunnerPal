@@ -1,7 +1,8 @@
-// RunnerPal placeholder assets (RUNNERPAL_TASK.md "Sahne Kurulumu" step 2): materials, UI icon sprites, pickup /
-// obstacle / finish / road prefabs, character models + CharacterData, and the per-world theme on the 40 levels.
-// Everything is simple primitives until real models arrive. Safe to rerun (overwrites, keeps asset GUIDs where
-// Unity can). Run with: unity command eval_file --file "C:\oyunyapimi\RunnerPall\Tools\eval\build_assets.cs"
+// RunnerPal assets (RUNNERPAL_TASK.md "Sahne Kurulumu" step 2): materials, UI icon sprites, pickup / obstacle /
+// finish / road prefabs, character models + CharacterData, and the per-world theme on the 40 levels. Pickups,
+// obstacles and the finish use Kenney (CC0) models and baked Quaternius outfit parts (see THIRD_PARTY.md).
+// Safe to rerun (overwrites, keeps asset GUIDs where Unity can).
+// Run with: unity command eval_file --file "C:\oyunyapimi\RunnerPall\Tools\eval\build_assets.cs"
 const string root = "Assets/RunnerPal/";
 foreach (var dir in new[] { "Materials", "Prefabs", "Sprites", "Characters", "Models" })
     if (!UnityEditor.AssetDatabase.IsValidFolder(root + dir)) UnityEditor.AssetDatabase.CreateFolder("Assets/RunnerPal", dir);
@@ -149,18 +150,161 @@ System.Action<UnityEngine.GameObject, Pickup.Kind, float, float> setPickup = (go
     p.speedMultiplier = mult;
 };
 
+// ---------- Model helpers ----------
+const string tp = "Assets/RunnerPal/ThirdParty/";
+System.Func<string, UnityEngine.GameObject> kenney = (path) =>
+{
+    var g = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.GameObject>(tp + path + ".fbx");
+    if (g == null) throw new System.Exception("Missing model " + tp + path + ".fbx");
+    return g;
+};
+// World bounds of everything rendered under a transform.
+System.Func<UnityEngine.Transform, UnityEngine.Bounds> boundsOf = (t) =>
+{
+    var rs = t.GetComponentsInChildren<UnityEngine.Renderer>();
+    var b = rs[0].bounds;
+    foreach (var r in rs) b.Encapsulate(r.bounds);
+    return b;
+};
+// Places a model under `parent`, scaled and rotated, then moved so its bounds' bottom-center (bottom = true) or
+// center sits at `at` (local to the parent, which sits at the origin while building).
+System.Func<UnityEngine.GameObject, UnityEngine.Transform, UnityEngine.Vector3, UnityEngine.Vector3, UnityEngine.Vector3, bool, UnityEngine.GameObject> place =
+    (src, parent, at, scale, euler, bottom) =>
+{
+    var g = (UnityEngine.GameObject)UnityEditor.PrefabUtility.InstantiatePrefab(src, parent);
+    g.transform.localRotation = UnityEngine.Quaternion.Euler(euler);
+    g.transform.localScale = scale;
+    g.transform.localPosition = UnityEngine.Vector3.zero;
+    var b = boundsOf(g.transform);
+    var anchor = bottom ? new UnityEngine.Vector3(b.center.x, b.min.y, b.center.z) : b.center;
+    g.transform.localPosition = at - (anchor - parent.position);
+    foreach (var r in g.GetComponentsInChildren<UnityEngine.Renderer>())
+        r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; // small props; saves shadow draws on phones
+    return g;
+};
+System.Action<UnityEngine.GameObject, UnityEngine.Material> paint = (g, m) =>
+{
+    foreach (var r in g.GetComponentsInChildren<UnityEngine.Renderer>())
+        r.sharedMaterials = System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Repeat(m, r.sharedMaterials.Length));
+};
+
+// Clothes as pickups: the character's own outfit parts (Quaternius, CC0) baked in their rest pose, without the
+// skin sub-meshes (hands, neck, ankles), so the item on the road is the same thing the runner puts on.
+System.Func<string, string, System.Func<string, UnityEngine.Material>, UnityEngine.GameObject> clothes = (partName, name, materialFor) =>
+{
+    var src = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.GameObject>(ModularCharacterBuilder.PartsDir + partName + ".fbx");
+    var inst = UnityEngine.Object.Instantiate(src);
+    var smr = inst.GetComponentInChildren<UnityEngine.SkinnedMeshRenderer>();
+    var baked = new UnityEngine.Mesh();
+    smr.BakeMesh(baked, true);
+    // Keep only the sub-meshes that get a material.
+    var keep = new System.Collections.Generic.List<int>();
+    var mats = new System.Collections.Generic.List<UnityEngine.Material>();
+    for (int i = 0; i < smr.sharedMaterials.Length; i++)
+    {
+        var m = materialFor(smr.sharedMaterials[i].name);
+        if (m == null) continue;
+        keep.Add(i);
+        mats.Add(m);
+    }
+    var mesh = new UnityEngine.Mesh { name = name };
+    mesh.indexFormat = baked.indexFormat;
+    mesh.vertices = baked.vertices;
+    mesh.normals = baked.normals;
+    mesh.uv = baked.uv;
+    mesh.subMeshCount = keep.Count;
+    for (int i = 0; i < keep.Count; i++) mesh.SetTriangles(baked.GetTriangles(keep[i]), i);
+    mesh.RecalculateBounds();
+    string meshPath = root + "Models/" + name + ".asset";
+    // Overwrite in place (same GUID) so prefabs keep their mesh reference across rebuilds.
+    var existing = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.Mesh>(meshPath);
+    if (existing != null) { UnityEditor.EditorUtility.CopySerialized(mesh, existing); existing.name = name; UnityEngine.Object.DestroyImmediate(mesh); mesh = existing; UnityEditor.EditorUtility.SetDirty(mesh); }
+    else UnityEditor.AssetDatabase.CreateAsset(mesh, meshPath);
+    // Write it out before a prefab points at it (otherwise some prefabs saved a reference that loaded as null).
+    UnityEditor.AssetDatabase.SaveAssets();
+    mesh = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.Mesh>(meshPath);
+
+    var g = new UnityEngine.GameObject(name);
+    g.AddComponent<UnityEngine.MeshFilter>().sharedMesh = mesh;
+    g.AddComponent<UnityEngine.MeshRenderer>().sharedMaterials = mats.ToArray();
+    // BakeMesh is in the renderer's space; keep the renderer's world rotation so the clothes stand upright.
+    g.transform.rotation = smr.transform.rotation;
+    UnityEngine.Object.DestroyImmediate(inst);
+    UnityEngine.Object.DestroyImmediate(baked);
+    return g;
+};
+// Wraps a loose model into `parent`, scaled so its largest side is `size`, centered at `at`.
+System.Action<UnityEngine.GameObject, UnityEngine.Transform, UnityEngine.Vector3, float> fit = (g, parent, at, size) =>
+{
+    var holder = new UnityEngine.GameObject(g.name + "_Holder").transform;
+    holder.SetParent(parent, false);
+    g.transform.SetParent(holder, true);
+    var b = boundsOf(holder);
+    float s = size / UnityEngine.Mathf.Max(b.size.x, UnityEngine.Mathf.Max(b.size.y, b.size.z));
+    g.transform.position -= b.center;
+    holder.localScale = UnityEngine.Vector3.one * s;
+    holder.localPosition = at;
+};
+
 // ---------- Pickups ----------
+// Gold: Kenney Platformer Kit coin, facing the runner, spins (Pickup).
 var goldGo = triggerRoot("Gold", UnityEngine.Vector3.zero, new UnityEngine.Vector3(0.9f, 0.9f, 0.9f));
-var coinVisual = part(UnityEngine.PrimitiveType.Cylinder, "Coin", goldGo.transform, UnityEngine.Vector3.zero, new UnityEngine.Vector3(0.6f, 0.06f, 0.6f), goldMat, false);
-coinVisual.transform.localRotation = UnityEngine.Quaternion.Euler(90f, 0f, 0f);
+place(kenney("Kenney_PlatformerKit/coin-gold"), goldGo.transform, UnityEngine.Vector3.zero, UnityEngine.Vector3.one * 1.6f, UnityEngine.Vector3.zero, false);
 setPickup(goldGo, Pickup.Kind.Gold, 0f, 1f);
 var goldPrefab = save(goldGo, "Gold");
 
+var white = mat("Cloth_White", new UnityEngine.Color(0.95f, 0.95f, 0.97f), 0.2f);
 var itemPrefabs = new System.Collections.Generic.Dictionary<ItemType, UnityEngine.GameObject>();
 foreach (var kv in itemColors)
 {
     var go = triggerRoot("Item_" + kv.Key, UnityEngine.Vector3.zero, new UnityEngine.Vector3(1.2f, 1.2f, 1.2f));
-    part(UnityEngine.PrimitiveType.Cube, "Box", go.transform, UnityEngine.Vector3.zero, new UnityEngine.Vector3(0.8f, 0.8f, 0.8f), itemMats[kv.Key], false);
+    var itemMat = itemMats[kv.Key];
+    switch (kv.Key)
+    {
+        case ItemType.Gomlek: // white shirt with a tie: every suit slot white except the tie
+            fit(clothes("Suit_Body", "Clothes_Gomlek", n => n == "Skin" ? null : n == "Tie" ? itemMats[ItemType.Ceket] : white), go.transform, UnityEngine.Vector3.zero, 1.45f);
+            break;
+        case ItemType.Ceket: // jacket over a white shirt
+            fit(clothes("Suit_Body", "Clothes_Ceket", n => n == "Skin" ? null : n == "Suit" ? itemMat : n == "Tie" ? itemMats[ItemType.Pantolon] : white), go.transform, UnityEngine.Vector3.zero, 1.45f);
+            break;
+        case ItemType.Pantolon:
+            fit(clothes("Suit_Legs", "Clothes_Pantolon", n => n == "Skin" ? null : itemMat), go.transform, UnityEngine.Vector3.zero, 1.05f);
+            break;
+        case ItemType.Ayakkabi: // the pair, a bit bigger than life so it reads from the lane
+            fit(clothes("Suit_Feet", "Clothes_Ayakkabi", n => n == "Skin" ? null : itemMat), go.transform, UnityEngine.Vector3.zero, 0.8f);
+            break;
+        case ItemType.Laptop: // Kenney Furniture Kit laptop, opened, screen towards the runner
+            fit((UnityEngine.GameObject)UnityEditor.PrefabUtility.InstantiatePrefab(kenney("Kenney_FurnitureKit/laptop")), go.transform, UnityEngine.Vector3.zero, 0.85f);
+            break;
+        case ItemType.Saat: // wrist watch: gold case, glass face, dark strap
+        {
+            var strap = mat("Watch_Strap", new UnityEngine.Color(0.2f, 0.12f, 0.08f), 0.3f);
+            var face = mat("Watch_Face", new UnityEngine.Color(0.92f, 0.94f, 0.98f), 0.9f);
+            var w = new UnityEngine.GameObject("Watch").transform;
+            w.SetParent(go.transform, false);
+            var caseGo = part(UnityEngine.PrimitiveType.Cylinder, "Case", w, UnityEngine.Vector3.zero, new UnityEngine.Vector3(0.5f, 0.06f, 0.5f), itemMat, false);
+            caseGo.transform.localRotation = UnityEngine.Quaternion.Euler(90f, 0f, 0f);
+            var faceGo = part(UnityEngine.PrimitiveType.Cylinder, "Face", w, new UnityEngine.Vector3(0f, 0f, -0.05f), new UnityEngine.Vector3(0.42f, 0.01f, 0.42f), face, false);
+            faceGo.transform.localRotation = UnityEngine.Quaternion.Euler(90f, 0f, 0f);
+            part(UnityEngine.PrimitiveType.Cube, "HandH", w, new UnityEngine.Vector3(0f, 0.06f, -0.065f), new UnityEngine.Vector3(0.025f, 0.12f, 0.01f), strap, false);
+            part(UnityEngine.PrimitiveType.Cube, "HandM", w, new UnityEngine.Vector3(0.06f, 0f, -0.065f), new UnityEngine.Vector3(0.14f, 0.02f, 0.01f), strap, false);
+            part(UnityEngine.PrimitiveType.Cube, "StrapTop", w, new UnityEngine.Vector3(0f, 0.42f, 0.02f), new UnityEngine.Vector3(0.26f, 0.38f, 0.05f), strap, false);
+            part(UnityEngine.PrimitiveType.Cube, "StrapBottom", w, new UnityEngine.Vector3(0f, -0.42f, 0.02f), new UnityEngine.Vector3(0.26f, 0.38f, 0.05f), strap, false);
+            break;
+        }
+        case ItemType.Telefon: // smartphone: black body, glowing screen, camera dot
+        {
+            var screen = glow("Phone_Screen", new UnityEngine.Color(0.35f, 0.65f, 1f));
+            var p = new UnityEngine.GameObject("Phone").transform;
+            p.SetParent(go.transform, false);
+            part(UnityEngine.PrimitiveType.Cube, "Body", p, UnityEngine.Vector3.zero, new UnityEngine.Vector3(0.46f, 0.9f, 0.06f), itemMat, false);
+            part(UnityEngine.PrimitiveType.Cube, "Screen", p, new UnityEngine.Vector3(0f, 0.02f, -0.032f), new UnityEngine.Vector3(0.4f, 0.76f, 0.005f), screen, false);
+            part(UnityEngine.PrimitiveType.Cube, "Home", p, new UnityEngine.Vector3(0f, -0.405f, -0.032f), new UnityEngine.Vector3(0.12f, 0.03f, 0.005f), lineMat, false);
+            var cam = part(UnityEngine.PrimitiveType.Cylinder, "Camera", p, new UnityEngine.Vector3(-0.12f, 0.33f, 0.035f), new UnityEngine.Vector3(0.09f, 0.01f, 0.09f), lineMat, false);
+            cam.transform.localRotation = UnityEngine.Quaternion.Euler(90f, 0f, 0f);
+            break;
+        }
+    }
     // A glowing gold ring under each item so it reads as "collect me" from far away.
     part(UnityEngine.PrimitiveType.Cylinder, "Halo", go.transform, new UnityEngine.Vector3(0f, -0.6f, 0f), new UnityEngine.Vector3(1.2f, 0.02f, 1.2f), goldMat, false);
     setPickup(go, Pickup.Kind.Item, 0f, 1f);
@@ -168,43 +312,53 @@ foreach (var kv in itemColors)
     itemPrefabs[kv.Key] = save(go, "Item_" + kv.Key);
 }
 
+// Speed boost: an energy drink (Kenney Food Kit soda can) with a green glow ring.
 var boostGo = triggerRoot("SpeedBoost", UnityEngine.Vector3.zero, new UnityEngine.Vector3(1.1f, 1.1f, 1.1f));
-var arrow = part(UnityEngine.PrimitiveType.Cube, "Arrow", boostGo.transform, UnityEngine.Vector3.zero, new UnityEngine.Vector3(0.5f, 0.5f, 0.5f), boostMat, false);
-arrow.transform.localRotation = UnityEngine.Quaternion.Euler(45f, 0f, 45f);
+place(kenney("Kenney_FoodKit/soda-can"), boostGo.transform, UnityEngine.Vector3.zero, UnityEngine.Vector3.one * 2.6f, new UnityEngine.Vector3(0f, 0f, 12f), false);
+part(UnityEngine.PrimitiveType.Cylinder, "Halo", boostGo.transform, new UnityEngine.Vector3(0f, -0.55f, 0f), new UnityEngine.Vector3(1.1f, 0.02f, 1.1f), boostMat, false);
 setPickup(boostGo, Pickup.Kind.SpeedBoost, 4f, 1.5f);
 var boostPrefab = save(boostGo, "SpeedBoost");
 
+// Shield: a glowing blue star (Kenney Platformer Kit).
 var shieldGo = triggerRoot("Shield", UnityEngine.Vector3.zero, new UnityEngine.Vector3(1.1f, 1.1f, 1.1f));
-part(UnityEngine.PrimitiveType.Sphere, "Bubble", shieldGo.transform, UnityEngine.Vector3.zero, new UnityEngine.Vector3(0.75f, 0.75f, 0.75f), shieldMat, false);
+paint(place(kenney("Kenney_PlatformerKit/star"), shieldGo.transform, UnityEngine.Vector3.zero, UnityEngine.Vector3.one * 2.4f, UnityEngine.Vector3.zero, false), shieldMat);
 setPickup(shieldGo, Pickup.Kind.Shield, 5f, 1f);
 var shieldPrefab = save(shieldGo, "Shield");
 
-// Spilled coffee: a flat puddle on the road (no spin).
+// Spilled coffee: a knocked-over cup (Kenney Food Kit) and its puddle on the road (no spin).
 var slowGo = triggerRoot("SlowTrap", new UnityEngine.Vector3(0f, 0.4f, 0f), new UnityEngine.Vector3(1.8f, 0.8f, 1.8f));
 part(UnityEngine.PrimitiveType.Cylinder, "Puddle", slowGo.transform, new UnityEngine.Vector3(0f, 0.01f, 0f), new UnityEngine.Vector3(1.7f, 0.01f, 1.7f), coffeeMat, false);
-part(UnityEngine.PrimitiveType.Cylinder, "Cup", slowGo.transform, new UnityEngine.Vector3(0.45f, 0.2f, 0.2f), new UnityEngine.Vector3(0.3f, 0.2f, 0.3f), lineMat, false);
+part(UnityEngine.PrimitiveType.Cylinder, "Splash", slowGo.transform, new UnityEngine.Vector3(0.35f, 0.012f, 0.45f), new UnityEngine.Vector3(0.8f, 0.01f, 0.6f), coffeeMat, false);
+place(kenney("Kenney_FoodKit/cup-coffee"), slowGo.transform, new UnityEngine.Vector3(0.55f, 0f, 0.55f), UnityEngine.Vector3.one * 3.2f, new UnityEngine.Vector3(0f, 35f, 90f), true);
 setPickup(slowGo, Pickup.Kind.SlowTrap, 3f, 0.5f);
 var slowPrefab = save(slowGo, "SlowTrap");
 
 // ---------- Obstacles (heights match PlayerController: standing 0-2 m, sliding 0-1 m, jump apex +2.2 m) ----------
-// Low: jump over it (0.8 m tall; a sliding player still hits it).
+// Obstacle.debrisMaterial: the Kenney models share one texture atlas, so the shards get a plain color instead.
+// Low: jump over it — a concrete road barrier (Kenney City Kit Roads) painted warning orange, 0.8 m tall, lane wide.
 var lowGo = triggerRoot("Obstacle_Low", new UnityEngine.Vector3(0f, 0.4f, 0f), new UnityEngine.Vector3(2.2f, 0.8f, 0.6f));
-part(UnityEngine.PrimitiveType.Cube, "Block", lowGo.transform, new UnityEngine.Vector3(0f, 0.4f, 0f), new UnityEngine.Vector3(2.2f, 0.8f, 0.6f), obstacleMat, false);
-lowGo.AddComponent<Obstacle>();
+place(kenney("Kenney_CityKitRoads/construction-barrier"), lowGo.transform, UnityEngine.Vector3.zero, new UnityEngine.Vector3(5f, 6.15f, 9.6f), new UnityEngine.Vector3(0f, 90f, 0f), true);
+paint(lowGo.transform.GetChild(0).gameObject, obstacleMat);
+lowGo.AddComponent<Obstacle>().debrisMaterial = obstacleMat;
 var lowPrefab = save(lowGo, "Obstacle_Low");
-// High: slide under it (bar from 1.3 m to 2.3 m; a sliding player's top is at 1 m).
+// High: slide under it — a road-works fence panel hung from 1.3 m to 2.3 m between two warning-light posts
+// (a sliding player's top is at 1 m).
 var highGo = triggerRoot("Obstacle_High", new UnityEngine.Vector3(0f, 1.8f, 0f), new UnityEngine.Vector3(2.2f, 1f, 0.4f));
-part(UnityEngine.PrimitiveType.Cube, "Bar", highGo.transform, new UnityEngine.Vector3(0f, 1.8f, 0f), new UnityEngine.Vector3(2.3f, 1f, 0.3f), barrierMat, false);
-part(UnityEngine.PrimitiveType.Cube, "PostL", highGo.transform, new UnityEngine.Vector3(-1.15f, 1.15f, 0f), new UnityEngine.Vector3(0.12f, 2.3f, 0.12f), postMat, false);
-part(UnityEngine.PrimitiveType.Cube, "PostR", highGo.transform, new UnityEngine.Vector3(1.15f, 1.15f, 0f), new UnityEngine.Vector3(0.12f, 2.3f, 0.12f), postMat, false);
-highGo.AddComponent<Obstacle>();
+place(kenney("Kenney_CityKitRoads/construction-fence"), highGo.transform, new UnityEngine.Vector3(0f, 1.3f, 0f), new UnityEngine.Vector3(5f, 5.6f, 6.1f), new UnityEngine.Vector3(0f, 90f, 0f), true);
+foreach (float x in new[] { -1.2f, 1.2f })
+    place(kenney("Kenney_CityKitRoads/construction-light"), highGo.transform, new UnityEngine.Vector3(x, 0f, 0f), UnityEngine.Vector3.one * 10.4f, UnityEngine.Vector3.zero, true);
+// The bar itself: a yellow warning board across the fence, 1.5-2.1 m.
+part(UnityEngine.PrimitiveType.Cube, "Board", highGo.transform, new UnityEngine.Vector3(0f, 1.8f, 0f), new UnityEngine.Vector3(2.25f, 0.6f, 0.06f), barrierMat, false);
+for (int s = 0; s < 5; s++)
+    part(UnityEngine.PrimitiveType.Cube, "Stripe", highGo.transform, new UnityEngine.Vector3(-0.9f + s * 0.45f, 1.8f, -0.04f), new UnityEngine.Vector3(0.16f, 0.62f, 0.02f), postMat, false).transform.localRotation = UnityEngine.Quaternion.Euler(0f, 0f, 35f);
+highGo.AddComponent<Obstacle>().debrisMaterial = barrierMat;
 var highPrefab = save(highGo, "Obstacle_High");
 
-// ---------- Finish: the office door across all three lanes ----------
+// ---------- Finish: the workplace door (Kenney Platformer Kit) across all three lanes, flags on both sides ----------
 var finishGo = triggerRoot("Finish", new UnityEngine.Vector3(0f, 2f, 0f), new UnityEngine.Vector3(8f, 4f, 1f));
-part(UnityEngine.PrimitiveType.Cube, "FrameL", finishGo.transform, new UnityEngine.Vector3(-3.9f, 2.2f, 0f), new UnityEngine.Vector3(0.4f, 4.4f, 0.4f), postMat, false);
-part(UnityEngine.PrimitiveType.Cube, "FrameR", finishGo.transform, new UnityEngine.Vector3(3.9f, 2.2f, 0f), new UnityEngine.Vector3(0.4f, 4.4f, 0.4f), postMat, false);
-part(UnityEngine.PrimitiveType.Cube, "Sign", finishGo.transform, new UnityEngine.Vector3(0f, 4.6f, 0f), new UnityEngine.Vector3(8.2f, 0.8f, 0.4f), doorMat, false);
+place(kenney("Kenney_PlatformerKit/door-large-open"), finishGo.transform, UnityEngine.Vector3.zero, new UnityEngine.Vector3(8.4f, 5.2f, 4f), UnityEngine.Vector3.zero, true);
+foreach (float x in new[] { -4.9f, 4.9f })
+    place(kenney("Kenney_PlatformerKit/flag"), finishGo.transform, new UnityEngine.Vector3(x, 0f, 0f), UnityEngine.Vector3.one * 4.4f, new UnityEngine.Vector3(0f, x < 0 ? 180f : 0f, 0f), true);
 finishGo.AddComponent<FinishLine>();
 var finishPrefab = save(finishGo, "Finish");
 

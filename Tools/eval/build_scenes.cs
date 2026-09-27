@@ -327,6 +327,24 @@ if (runnerAudio.ouch[0] == null || runnerAudio.coin[0] == null) throw new System
 string gamePath = root + "Scenes/Game.unity";
 UnityEditor.SceneManagement.EditorSceneManager.SaveScene(game, gamePath);
 
+// Music (Juhani Junkala, CC0): streamed so the long tracks do not sit in memory; one per world, see SceneMusic.
+System.Func<string, UnityEngine.AudioClip> music = n =>
+{
+    string p = root + "Audio/Music/" + n + ".ogg";
+    var imp = (UnityEditor.AudioImporter)UnityEditor.AssetImporter.GetAtPath(p);
+    var st = imp.defaultSampleSettings;
+    st.loadType = UnityEngine.AudioClipLoadType.Streaming;
+    st.compressionFormat = UnityEngine.AudioCompressionFormat.Vorbis;
+    st.quality = 0.5f;
+    imp.defaultSampleSettings = st;
+    imp.loadInBackground = true;
+    imp.SaveAndReimport();
+    return UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.AudioClip>(p);
+};
+var gameMusic = new UnityEngine.GameObject("Music").AddComponent<SceneMusic>();
+gameMusic.worldClips = new[] { music("world_office"), music("world_bank"), music("world_sales"), music("world_dev") };
+UnityEditor.SceneManagement.EditorSceneManager.SaveScene(game, gamePath);
+
 // =====================================================================================================
 // MainMenu scene: title, total gold, character shop, OYNA
 // =====================================================================================================
@@ -381,6 +399,7 @@ shop.totalGoldText = totalGold;
 UnityEditor.Events.UnityEventTools.AddPersistentListener(playBtn.onClick, shop.Play);
 UnityEditor.EditorUtility.SetDirty(shop);
 string menuPath = root + "Scenes/MainMenu.unity";
+new UnityEngine.GameObject("Music").AddComponent<SceneMusic>().menuClip = music("menu");
 UnityEditor.SceneManagement.EditorSceneManager.SaveScene(menu, menuPath);
 
 UnityEditor.EditorBuildSettings.scenes = new[]

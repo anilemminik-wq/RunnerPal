@@ -9,7 +9,7 @@ using UnityEngine;
 // base look = Beach body (tank top, recolored white) + Beach legs (red shorts = "don") + Beach feet, one head per
 // character; outfit = Suit legs (Pantolon), Suit feet (Ayakkabı), Suit body (Gömlek + Ceket via SuitTorso), and
 // small props on bones for Saat / Telefon / Laptop. All parts are rebound to one armature and driven by one
-// Animator (Run / Idle / Roll-as-slide / HitRecieve / a Jump pose made from Run).
+// humanoid Animator with Quaternius Universal Animation Library clips (run, jump start/air/land, roll, hit, death).
 public static class ModularCharacterBuilder
 {
     public const string PartsDir = "Assets/RunnerPal/ThirdParty/Quaternius_UltimateModularMen/";
@@ -34,50 +34,51 @@ public static class ModularCharacterBuilder
 
     static GameObject Part(string name) => AssetDatabase.LoadAssetAtPath<GameObject>(PartsDir + name + ".fbx");
 
+    // ---------- Animation: Quaternius Universal Animation Library (CC0, humanoid) ----------
+
+    public const string UalPath = "Assets/RunnerPal/ThirdParty/Quaternius_UAL/UAL1_Standard.fbx";
+
+
     static AnimationClip Clip(string name) =>
-        AssetDatabase.LoadAllAssetsAtPath(PartsDir + "Animations.fbx").OfType<AnimationClip>()
-            .FirstOrDefault(c => c.name == "CharacterArmature|" + name);
+        AssetDatabase.LoadAllAssetsAtPath(UalPath).OfType<AnimationClip>().FirstOrDefault(c => c.name == "Armature|" + name);
 
-    // ---------- Animation ----------
-
-    // Run / Idle loop; everything else plays once.
+    // Humanoid import as in Quaternius' Unity setup: bake axis conversion, loop the *_Loop clips, and keep every
+    // clip in place (the runner moves by code, not root motion).
     static void SetupClipImport()
     {
-        var importer = (ModelImporter)AssetImporter.GetAtPath(PartsDir + "Animations.fbx");
+        var importer = (ModelImporter)AssetImporter.GetAtPath(UalPath);
+        importer.bakeAxisConversion = true;
+        importer.animationType = ModelImporterAnimationType.Human;
+        importer.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
         var clips = importer.defaultClipAnimations;
         foreach (var c in clips)
-            c.loopTime = c.name.EndsWith("|Run") || c.name.Contains("|Idle");
+        {
+            c.loopTime = c.name.EndsWith("_Loop");
+            c.lockRootRotation = true;
+            c.lockRootHeightY = true;
+            c.lockRootPositionXZ = true;
+            c.keepOriginalOrientation = true;
+            c.keepOriginalPositionY = true;
+            c.keepOriginalPositionXZ = true;
+        }
         importer.clipAnimations = clips;
         importer.SaveAndReimport();
-    }
-
-    // The pack has no jump, so hold a mid-stride frame of the run (legs apart) as a leap pose.
-    static AnimationClip MakeJumpPose(AnimationClip run)
-    {
-        string path = AnimDir + "Jump.anim";
-        var jump = AssetDatabase.LoadAssetAtPath<AnimationClip>(path);
-        if (jump == null) { jump = new AnimationClip(); AssetDatabase.CreateAsset(jump, path); }
-        jump.ClearCurves();
-        float t = run.length * 0.25f;
-        foreach (var binding in AnimationUtility.GetCurveBindings(run))
-        {
-            float v = AnimationUtility.GetEditorCurve(run, binding).Evaluate(t);
-            AnimationUtility.SetEditorCurve(jump, binding, new AnimationCurve(new Keyframe(0f, v), new Keyframe(0.6f, v)));
-        }
-        EditorUtility.SetDirty(jump);
-        return jump;
     }
 
     public static AnimatorController BuildController()
     {
         if (!AssetDatabase.IsValidFolder("Assets/RunnerPal/Animation")) AssetDatabase.CreateFolder("Assets/RunnerPal", "Animation");
         SetupClipImport();
-        var run = Clip("Run");
-        var idle = Clip("Idle");
+        var idle = Clip("Idle_Loop");
+        var run = Clip("Sprint_Loop");
+        var jumpStart = Clip("Jump_Start");
+        var jumpLoop = Clip("Jump_Loop");
+        var jumpLand = Clip("Jump_Land");
         var roll = Clip("Roll");
-        var hit = Clip("HitRecieve");
-        var death = Clip("Death");
-        var jump = MakeJumpPose(run);
+        var hit = Clip("Hit_Chest");
+        var death = Clip("Death01");
+        if (run == null || jumpStart == null) throw new System.Exception("UAL clips not found in " + UalPath);
+        AssetDatabase.DeleteAsset(AnimDir + "Jump.anim"); // the old held-pose jump
 
         string path = AnimDir + "Runner.controller";
         AssetDatabase.DeleteAsset(path);
@@ -94,38 +95,87 @@ public static class ModularCharacterBuilder
         var sm = ctrl.layers[0].stateMachine;
         var sIdle = sm.AddState("Idle"); sIdle.motion = idle;
         var sRun = sm.AddState("Run"); sRun.motion = run;
-        var sJump = sm.AddState("Jump"); sJump.motion = jump;
+        // Jump in three parts, timed to PlayerController's ~0.66 s airtime: take-off, in the air, landing.
+        var sJumpStart = sm.AddState("JumpStart"); sJumpStart.motion = jumpStart; sJumpStart.speed = jumpStart.length / 0.12f;
+        var sJumpAir = sm.AddState("JumpAir"); sJumpAir.motion = jumpLoop;
+        var sJumpLand = sm.AddState("JumpLand"); sJumpLand.motion = jumpLand; sJumpLand.speed = jumpLand.length / 0.22f;
         var sSlide = sm.AddState("Slide"); sSlide.motion = roll;
         sSlide.speed = roll.length / 0.7f; // PlayerController.slideDuration
-        var sHit = sm.AddState("Hit"); sHit.motion = hit;
+        var sHit = sm.AddState("Hit"); sHit.motion = hit; sHit.speed = 1.4f;
         var sFall = sm.AddState("Fall"); sFall.motion = death;
-        var toFall = sm.AddAnyStateTransition(sFall);
-        toFall.AddCondition(AnimatorConditionMode.If, 0, "Fall");
-        toFall.duration = 0.1f;
-        toFall.hasExitTime = false;
-        toFall.canTransitionToSelf = false;
         sm.defaultState = sIdle;
 
-        var toRun = sIdle.AddTransition(sRun); toRun.AddCondition(AnimatorConditionMode.If, 0, "Running"); toRun.duration = 0.15f; toRun.hasExitTime = false;
-        var toIdle = sRun.AddTransition(sIdle); toIdle.AddCondition(AnimatorConditionMode.IfNot, 0, "Running"); toIdle.duration = 0.2f; toIdle.hasExitTime = false;
-        foreach (var (state, trigger) in new[] { (sJump, "Jump"), (sSlide, "Slide"), (sHit, "Hit") })
+        AnimatorStateTransition T(AnimatorState from, AnimatorState to, float duration, float exitTime = -1f)
+        {
+            var t = from.AddTransition(to);
+            t.duration = duration;
+            t.hasExitTime = exitTime >= 0f;
+            if (exitTime >= 0f) t.exitTime = exitTime;
+            return t;
+        }
+        T(sIdle, sRun, 0.15f).AddCondition(AnimatorConditionMode.If, 0, "Running");
+        T(sRun, sIdle, 0.2f).AddCondition(AnimatorConditionMode.IfNot, 0, "Running");
+        T(sJumpStart, sJumpAir, 0.05f, 0.95f);
+        // JumpAir is a loop; leave it after ~0.42 s of air, just before touching down (normalized time = seconds / clip length).
+        T(sJumpAir, sJumpLand, 0.06f, 0.42f / Mathf.Max(0.01f, jumpLoop.length));
+        T(sJumpLand, sRun, 0.1f, 0.85f);
+        T(sSlide, sRun, 0.12f, 0.9f);
+        T(sHit, sRun, 0.12f, 0.8f);
+
+        foreach (var (state, trigger) in new[] { (sJumpStart, "Jump"), (sSlide, "Slide"), (sHit, "Hit"), (sFall, "Fall") })
         {
             var any = sm.AddAnyStateTransition(state);
             any.AddCondition(AnimatorConditionMode.If, 0, trigger);
             any.duration = 0.08f;
             any.hasExitTime = false;
             any.canTransitionToSelf = false;
-            var back = state.AddTransition(sRun);
-            back.hasExitTime = true;
-            back.exitTime = 0.9f;
-            back.duration = 0.12f;
-            var stop = state.AddTransition(sIdle);
-            stop.AddCondition(AnimatorConditionMode.IfNot, 0, "Running");
-            stop.hasExitTime = false;
-            stop.duration = 0.15f;
         }
+        foreach (var state in new[] { sJumpStart, sJumpAir, sJumpLand, sSlide, sHit })
+            T(state, sIdle, 0.15f).AddCondition(AnimatorConditionMode.IfNot, 0, "Running");
         EditorUtility.SetDirty(ctrl);
         return ctrl;
+    }
+
+    // The pack's feet hang off the root (Blender IK); Unity's humanoid wants them under the lower legs.
+    // Moving them keeps their world pose, so the skinning (bind poses) is unchanged.
+    static void ParentFeetToLegs(Transform armature)
+    {
+        var bones = armature.GetComponentsInChildren<Transform>().ToDictionary(t => t.name, t => t);
+        bones["Foot.L"].SetParent(bones["LowerLeg.L"], true);
+        bones["Foot.R"].SetParent(bones["LowerLeg.R"], true);
+    }
+
+    // A humanoid avatar per character (saved next to the controller), mapped by hand because the bone names and the
+    // IK feet defeat Unity's automapper. The pack's "Hips" bone only carries the upper body (legs hang off "Body"),
+    // so "Body" is the humanoid hips.
+    static Avatar BuildAvatar(GameObject root, string id)
+    {
+        var map = new Dictionary<string, string>
+        {
+            { "Hips", "Body" }, { "Spine", "Abdomen" }, { "Chest", "Torso" }, { "UpperChest", "Chest" },
+            { "Neck", "Neck" }, { "Head", "Head" },
+            { "LeftShoulder", "Shoulder.L" }, { "LeftUpperArm", "UpperArm.L" }, { "LeftLowerArm", "LowerArm.L" }, { "LeftHand", "Wrist.L" },
+            { "RightShoulder", "Shoulder.R" }, { "RightUpperArm", "UpperArm.R" }, { "RightLowerArm", "LowerArm.R" }, { "RightHand", "Wrist.R" },
+            { "LeftUpperLeg", "UpperLeg.L" }, { "LeftLowerLeg", "LowerLeg.L" }, { "LeftFoot", "Foot.L" },
+            { "RightUpperLeg", "UpperLeg.R" }, { "RightLowerLeg", "LowerLeg.R" }, { "RightFoot", "Foot.R" },
+        };
+        var desc = new HumanDescription
+        {
+            human = map.Select(kv => new HumanBone { humanName = kv.Key, boneName = kv.Value, limit = new HumanLimit { useDefaultValues = true } }).ToArray(),
+            skeleton = root.GetComponentsInChildren<Transform>().Select(t => new SkeletonBone
+            {
+                name = t.name, position = t.localPosition, rotation = t.localRotation, scale = t.localScale,
+            }).ToArray(),
+            upperArmTwist = 0.5f, lowerArmTwist = 0.5f, upperLegTwist = 0.5f, lowerLegTwist = 0.5f,
+            armStretch = 0.05f, legStretch = 0.05f, feetSpacing = 0f, hasTranslationDoF = false,
+        };
+        var avatar = AvatarBuilder.BuildHumanAvatar(root, desc);
+        avatar.name = "Avatar_" + id;
+        string avatarPath = AnimDir + "Avatar_" + id + ".asset";
+        if (!avatar.isValid || !avatar.isHuman) throw new System.Exception("RunnerAvatar is not a valid humanoid");
+        AssetDatabase.DeleteAsset(avatarPath);
+        AssetDatabase.CreateAsset(avatar, avatarPath);
+        return avatar;
     }
 
     // ---------- Assembly ----------
@@ -210,7 +260,10 @@ public static class ModularCharacterBuilder
         }
 
         var armature = go.transform.Find("CharacterArmature");
-        var animator = armature.gameObject.AddComponent<Animator>();
+        ParentFeetToLegs(armature);
+        // Humanoid so the Universal Animation Library clips retarget onto this skeleton.
+        var animator = go.AddComponent<Animator>();
+        animator.avatar = BuildAvatar(go, id);
         animator.runtimeAnimatorController = controller;
         animator.applyRootMotion = false;
         animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;

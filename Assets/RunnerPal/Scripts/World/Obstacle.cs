@@ -6,6 +6,8 @@ public class Obstacle : MonoBehaviour
 {
     [Tooltip("Çarpılınca kaç parçaya ayrılsın")]
     public int debrisCount = 8;
+    [Tooltip("Parçaların malzemesi (boşsa modelin ilk malzemesi)")]
+    public Material debrisMaterial;
 
     bool broken;
 
@@ -22,7 +24,7 @@ public class Obstacle : MonoBehaviour
         broken = true;
         foreach (var c in GetComponentsInChildren<Collider>()) c.enabled = false;
         var renderers = GetComponentsInChildren<Renderer>();
-        Material mat = renderers.Length > 0 ? renderers[0].sharedMaterial : null;
+        Material mat = debrisMaterial ? debrisMaterial : renderers.Length > 0 ? renderers[0].sharedMaterial : null;
         Bounds bounds = renderers.Length > 0 ? renderers[0].bounds : new Bounds(transform.position, Vector3.one);
         foreach (var r in renderers) { bounds.Encapsulate(r.bounds); r.enabled = false; }
 

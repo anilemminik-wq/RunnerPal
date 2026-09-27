@@ -1,6 +1,7 @@
 # RunnerPal — session handoff
 
-> **Türkçe özet:** Proje kuruldu ve oynanabilir durumda (yer tutucu küp/kapsül modellerle). 40 bölüm, 4 dünya,
+> **Türkçe özet:** Proje oynanabilir: gerçek karakterler ve animasyonlar (zıplama dahil), gerçek eşya / engel / kapı
+> modelleri, şehir, sesler ve müzik. 40 bölüm, 4 dünya,
 > kurallar görev dosyasındaki gibi çalışıyor ve test edildi. Sıradaki adımlar aşağıda "Next steps" bölümünde.
 > Yeni oturumda Claude'a "HANDOFF.md'yi oku ve devam edelim" demen yeterli.
 
@@ -12,7 +13,13 @@ Last updated: 2026-09-27. Read this first, then `CLAUDE.md`, then `RUNNERPAL_TAS
   `Assets/RunnerPal/Scripts` (as delivered, plus the fixes below). Compiles clean.
 - `RunnerPal > 40 Bölüm Oluştur` generated `Assets/RunnerPal/Levels/Level_01..40`. `build_assets.cs` gives each
   world its road prefab (`Road_Office/Bank/Sales/Dev`), procedural skybox and fog color.
-- Placeholder prefabs in `Assets/RunnerPal/Prefabs`: Gold, Item_<7 items> (colored cube + gold halo), SpeedBoost,
+- Prefabs in `Assets/RunnerPal/Prefabs` (built by `build_assets.cs`, real models since 2026-09-27): Gold = Kenney
+  coin; Item_Gomlek/Pantolon/Ceket/Ayakkabi = the Quaternius suit parts baked into static meshes
+  (`Models/Clothes_*.asset`, skin sub-meshes dropped); Laptop = Kenney laptop; Saat / Telefon = built from primitives;
+  SpeedBoost = soda can, Shield = blue star, SlowTrap = tipped coffee cup + puddle, Obstacle_Low = orange concrete
+  barrier, Obstacle_High = fence + striped board between warning-light posts, Finish = stretched Kenney door + flags.
+  Collider sizes are unchanged. Obstacle debris uses `Obstacle.debrisMaterial` (Kenney models share a texture atlas).
+  Old placeholder list, for reference: Gold, Item_<7 items> (colored cube + gold halo), SpeedBoost,
   Shield, SlowTrap (coffee puddle), Obstacle_Low (0.8 m, jump it), Obstacle_High (bar 1.3-2.3 m, slide under),
   Finish (office door), roads (20 m x 7.5 m, 3 lanes of 2.5 m). UI prefabs: RequiredIcon, ShopCard.
 - Characters: 4 `CharacterData` (default Mehmet Bey 0, Kemal Abi 150, Burak 300, Hasan Usta 500). Models are
@@ -23,7 +30,12 @@ Last updated: 2026-09-27. Read this first, then `CLAUDE.md`, then `RUNNERPAL_TAS
   - outfit: Suit_Legs = Pantolon, Suit_Feet = Ayakkabı (each hides the Beach part under it), Suit_Body = Gömlek +
     Ceket (`SuitTorso` recolors its slots: shirt only → white long-sleeve; jacket only → jacket on bare chest;
     both → full suit). Saat / Telefon / Laptop = small props on the wrist bones.
-  - Animator `Animation/Runner.controller` (on `CharacterArmature`): Idle, Run, Slide = Roll clip sped up to
+  - Animator on the model root, **humanoid**: `Animation/Avatar_<id>.asset` built by hand in `BuildAvatar` (the
+    pack's feet hang off `Root`, so `ParentFeetToLegs` moves them under the lower legs first; humanoid Hips = `Body`,
+    because the pack's `Hips` bone only carries the upper body). Clips from Quaternius **Universal Animation Library**
+    (`ThirdParty/Quaternius_UAL/UAL1_Standard.fbx`, imported Human): Idle_Loop, Sprint_Loop, Jump_Start → Jump_Loop →
+    Jump_Land (timed to the 0.66 s airtime), Roll (slide, 0.7 s), Hit_Chest, Death01 (Fall).
+  - Old (replaced): Animator `Animation/Runner.controller` (on `CharacterArmature`): Idle, Run, Slide = Roll clip sped up to
     0.7 s, Hit = HitRecieve, Jump = a held mid-stride Run frame (`Animation/Jump.anim`; the pack has no jump).
   - Download source: Google Drive folder `1USAAquX2JJWuA2m6zol0KUkFe3UkZ8zX` (from the pack page). Public Drive
     folders list without login via `https://drive.google.com/embeddedfolderview?id=<folder>`; files download via
@@ -46,7 +58,10 @@ Last updated: 2026-09-27. Read this first, then `CLAUDE.md`, then `RUNNERPAL_TAS
   obstacle still shatters, with a light shake and no life lost.
 - **Sounds** (`Scripts/Feedback/RunnerAudio.cs`, clips in `Audio/SFX`, list in `Audio/SFX/LICENSES.txt`): coin
   (random pitch), item, speed boost, shield, coffee trap, jump, slide, break + thud + random "ah!" (ouch1-5, cut
-  from a CC0 grunt recording with ffmpeg), win, fail. No music yet.
+  from a CC0 grunt recording with ffmpeg), win, fail.
+- **Music** (Juhani Junkala, CC0, `Audio/Music/`, streamed Vorbis): `MusicPlayer` (persistent, crossfades, keeps
+  playing across level reloads) + `SceneMusic` in each scene: menu track in MainMenu, one track per world in Game
+  (world = (levelNumber - 1) / 10); ducked on win / fail so the jingles are heard.
 - **City:** `build_assets.cs` makes 4 road variants per world (`Road_<World>_0..3`, TrackSpawner picks randomly):
   sidewalks, street lamps, a front row of buildings facing the road and a bigger skyline row, from Kenney City Kit
   Commercial (office / bank / dev) and Suburban (sales), scaled x9. Building shadows are off (phones).
@@ -64,7 +79,8 @@ Last updated: 2026-09-27. Read this first, then `CLAUDE.md`, then `RUNNERPAL_TAS
 
 ## Next steps (ideas; ask the user)
 
-1. Art: character done (see above). Still placeholder: road pieces, props per world, pickups, obstacles, finish
+1. Art: characters, animations, pickups, obstacles, finish and city are real models now. Possible polish: clothes
+   pickups are in T-pose (arms out), a job sign on the finish door, props per world. (Old note: road pieces, props per world, pickups, obstacles, finish
    door. Quaternius has CC0 city/office packs that could fit; keep licenses CC0 / owned. A real jump animation
    (e.g. Quaternius Universal Animation Library, needs a humanoid setup) would beat the held pose.
 2. Feel: sounds and music, collect/hit effects, camera shake, UI polish (DirectBall got a "neon frame" look —
@@ -90,3 +106,9 @@ unity command eval_file --file "C:\oyunyapimi\RunnerPall\Tools\eval\build_scenes
   until it settles.
 - `PlayerOutfit` only hides parts in `Awake`; the game reloads the scene per level, so calling
   `GameManager.LoadLevel` twice in one scene (tests) keeps the earlier outfit visible.
+- Unity CLI: the Editor only ticks Play mode while focused. Call `unity command editor_focus` before each check
+  (`set_autotick` was not enough). Long `eval_file` runs report "timed out after 5000ms" but keep going.
+- Mesh assets created in the same eval as the prefabs that use them: call `AssetDatabase.SaveAssets()` and reload
+  the mesh first, otherwise some prefabs loaded the mesh as null.
+- **Save data:** the user has real progress now (gold, level, owned characters in `rp_*` PlayerPrefs). Tests must
+  not finish a level; check the values before and after.
