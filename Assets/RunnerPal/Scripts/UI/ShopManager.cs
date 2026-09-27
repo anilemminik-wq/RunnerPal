@@ -11,6 +11,9 @@ public class ShopManager : MonoBehaviour
     public GameObject shopItemPrefab;   // Kökünde ShopItemView olan kart prefabı
     public TMP_Text totalGoldText;
 
+    // Seçim değişince (harita karakter resmini yeniler).
+    public event System.Action Changed;
+
     void Start() => Refresh();
 
     public void Refresh()
@@ -24,6 +27,8 @@ public class ShopManager : MonoBehaviour
 
             if (view.icon && ch.icon) view.icon.sprite = ch.icon;
             view.nameText.text = ch.displayName;
+            if (view.statsText)
+                view.statsText.text = $"<b>{ch.lives} can</b>   Hız %{Mathf.RoundToInt(ch.speedMultiplier * 100)}   Zıplama %{Mathf.RoundToInt(ch.jumpMultiplier * 100)}\n<size=85%><color=#C8D2EB>{ch.description}</color></size>";
 
             bool owned = SaveSystem.IsOwned(ch.id);
             bool selected = SaveSystem.SelectedCharacter == ch.id;
@@ -45,6 +50,7 @@ public class ShopManager : MonoBehaviour
         }
         SaveSystem.SelectedCharacter = ch.id;
         Refresh();
+        Changed?.Invoke();
     }
 
     public void Play() => SceneManager.LoadScene("Game");

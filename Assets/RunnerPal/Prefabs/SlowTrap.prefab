@@ -166,6 +166,9 @@ MonoBehaviour:
   speedMultiplier: 0.5
   spinSpeed: 120
   collectEffect: {fileID: 0}
+  spinTarget: {fileID: 0}
+  magnetRange: 16
+  magnetSpeed: 40
 --- !u!1 &8963746522169517704
 GameObject:
   m_ObjectHideFlags: 0

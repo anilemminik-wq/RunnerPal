@@ -20,6 +20,9 @@ public static class SaveSystem
         set { PlayerPrefs.SetInt(KeyLevel, Mathf.Max(1, value)); PlayerPrefs.Save(); }
     }
 
+    // Haritada seçilen bölüm (kaydedilmez, oyun açıkken geçerli). 0 = seçilmedi.
+    public static int PlayLevel;
+
     public static string SelectedCharacter
     {
         get => PlayerPrefs.GetString(KeySelectedChar, "default");

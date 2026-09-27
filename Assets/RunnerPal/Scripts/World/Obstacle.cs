@@ -4,6 +4,13 @@ using UnityEngine;
 // Kaçma şekli collider'ın yüksekliğiyle belirlenir (alçak engel = zıpla, yüksek bariyer = eğil).
 public class Obstacle : MonoBehaviour
 {
+    // Breakable: çarpınca parçalanır. Hole: açık rögar, içine düşülür (zıpla ya da şerit değiştir).
+    // Vehicle: araba, çarpınca savrulur.
+    public enum Kind { Breakable, Hole, Vehicle }
+    public Kind kind = Kind.Breakable;
+    [Tooltip("Bu engel en erken hangi bölümde çıkar")]
+    public int minLevel = 1;
+
     [Tooltip("Çarpılınca kaç parçaya ayrılsın")]
     public int debrisCount = 8;
     [Tooltip("Parçaların malzemesi (boşsa modelin ilk malzemesi)")]
@@ -23,6 +30,17 @@ public class Obstacle : MonoBehaviour
         if (broken) return;
         broken = true;
         foreach (var c in GetComponentsInChildren<Collider>()) c.enabled = false;
+        if (kind == Kind.Hole) return; // çukur yerinde kalır, düşme efektini HitFeedback yapar
+        if (kind == Kind.Vehicle)
+        {
+            var mover = GetComponent<ObstacleMover>();
+            if (mover) mover.enabled = false;
+            Vector3 side = transform.position - hitFrom; side.y = 0f;
+            var fly = gameObject.AddComponent<Debris>();
+            fly.life = 1.4f;
+            fly.velocity = side.normalized * 6f + Vector3.up * 7f + Vector3.forward * 10f;
+            return;
+        }
         var renderers = GetComponentsInChildren<Renderer>();
         Material mat = debrisMaterial ? debrisMaterial : renderers.Length > 0 ? renderers[0].sharedMaterial : null;
         Bounds bounds = renderers.Length > 0 ? renderers[0].bounds : new Bounds(transform.position, Vector3.one);

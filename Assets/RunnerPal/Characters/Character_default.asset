@@ -15,5 +15,9 @@ MonoBehaviour:
   id: default
   displayName: Mehmet Bey
   price: 0
-  icon: {fileID: 8247139749702405045, guid: f682c3072a625a04a9e49db85ae0282e, type: 3}
+  icon: {fileID: 21300000, guid: f682c3072a625a04a9e49db85ae0282e, type: 3}
   modelPrefab: {fileID: 3441486795370847732, guid: 7a2fba986b4e90845a726284c01a64ac, type: 3}
+  lives: 3
+  speedMultiplier: 1
+  jumpMultiplier: 1
+  description: "Dengeli: 3 can, normal h\u0131z."

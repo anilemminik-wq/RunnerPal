@@ -40,9 +40,25 @@ public class HitFeedback : MonoBehaviour
     {
         if (obstacle) obstacle.Break(player.transform.position);
         if (!damaged) { cameraFollow?.Shake(0.12f, 0.2f); return; }
+        if (obstacle && obstacle.kind == Obstacle.Kind.Hole) StartCoroutine(FallIntoHole());
         cameraFollow?.Shake(0.35f, 0.4f);
         flashLeft = flashTime;
     }
+
+    // Açık rögar: adam deliğe düşer, sonra çıkıp koşmaya devam eder.
+    System.Collections.IEnumerator FallIntoHole()
+    {
+        var model = player.modelRoot;
+        if (!model) yield break;
+        float baseY = model.localPosition.y;
+        for (float t = 0f; t < 1f; t += Time.deltaTime / 0.18f) { SetY(model, Mathf.Lerp(baseY, baseY - 1.3f, t * t)); yield return null; }
+        SetY(model, baseY - 1.3f);
+        yield return new WaitForSeconds(0.3f);
+        for (float t = 0f; t < 1f; t += Time.deltaTime / 0.3f) { SetY(model, Mathf.Lerp(baseY - 1.3f, baseY, 1f - (1f - t) * (1f - t))); yield return null; }
+        SetY(model, baseY);
+    }
+
+    static void SetY(Transform t, float y) { var p = t.localPosition; p.y = y; t.localPosition = p; }
 
     void OnLives(int lives)
     {

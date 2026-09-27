@@ -11,6 +11,8 @@ public class RunnerAudio : MonoBehaviour
     public AudioClip item, powerUp, shield, slowTrap, jump, slide, win, fail;
     public AudioClip[] breakObstacle;
     public AudioClip thud;
+    [Tooltip("Enerji içeceği içilince / taksiye binince")]
+    public AudioClip energy, taxi;
     [Tooltip("Can gidince rastgele biri çalar")]
     public AudioClip[] ouch;
 
@@ -40,6 +42,8 @@ public class RunnerAudio : MonoBehaviour
             player.Jumped += OnJumped;
             player.Slid += OnSlid;
             player.HitObstacle += OnHit;
+            player.EnergyUsed += OnEnergy;
+            player.TaxiChanged += OnTaxi;
         }
         if (gm)
         {
@@ -57,6 +61,8 @@ public class RunnerAudio : MonoBehaviour
             player.Jumped -= OnJumped;
             player.Slid -= OnSlid;
             player.HitObstacle -= OnHit;
+            player.EnergyUsed -= OnEnergy;
+            player.TaxiChanged -= OnTaxi;
         }
         if (gm)
         {
@@ -74,6 +80,9 @@ public class RunnerAudio : MonoBehaviour
         src.pitch = pitch;
         src.PlayOneShot(clip, vol * volume);
     }
+
+    void OnEnergy() => Play(energy ? energy : powerUp, 1f, 1.15f);
+    void OnTaxi(bool entered) { if (entered) Play(taxi ? taxi : powerUp, 1f, 0.8f); }
 
     static AudioClip Pick(AudioClip[] clips) => clips != null && clips.Length > 0 ? clips[Random.Range(0, clips.Length)] : null;
 

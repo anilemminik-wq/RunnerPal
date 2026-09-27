@@ -13,7 +13,11 @@ MonoBehaviour:
   m_Name: Character_hasan
   m_EditorClassIdentifier: Assembly-CSharp::CharacterData
   id: hasan
-  displayName: Hasan Usta
+  displayName: "Z\u0131pz\u0131p Hasan"
   price: 500
-  icon: {fileID: 8999278764858676448, guid: 22a6adbf26f5e9d4dbb3971dc5a324ce, type: 3}
+  icon: {fileID: 21300000, guid: 22a6adbf26f5e9d4dbb3971dc5a324ce, type: 3}
   modelPrefab: {fileID: 6912376231095793898, guid: 7ac3eaedd73985c41b03833485387dbf, type: 3}
+  lives: 2
+  speedMultiplier: 1.05
+  jumpMultiplier: 1.4
+  description: "\xC7ok y\xFCkse\u011Fe z\u0131plar, 2 can."

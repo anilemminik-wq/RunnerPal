@@ -145,6 +145,19 @@ public static class ModularCharacterBuilder
         bones["Foot.R"].SetParent(bones["LowerLeg.R"], true);
     }
 
+    // Belly: the abdomen bone widens (bones run along their local Y, so X/Z are girth); the chest takes back most
+    // of it so the arms and head keep their size.
+    static void Shape(Transform armature, Look look)
+    {
+        if (look.belly <= 0f || Mathf.Approximately(look.belly, 1f)) return;
+        var bones = armature.GetComponentsInChildren<Transform>().ToDictionary(t => t.name, t => t);
+        bones["Abdomen"].localScale = new Vector3(look.belly, 1f, look.belly);
+        float back = 1.1f / look.belly;
+        bones["Torso"].localScale = new Vector3(back, 1f, back);
+        float legs = Mathf.Lerp(1f, look.belly, 0.4f);
+        bones["UpperLeg.L"].localScale = bones["UpperLeg.R"].localScale = new Vector3(legs, 1f, legs);
+    }
+
     // A humanoid avatar per character (saved next to the controller), mapped by hand because the bone names and the
     // IK feet defeat Unity's automapper. The pack's "Hips" bone only carries the upper body (legs hang off "Body"),
     // so "Body" is the humanoid hips.
@@ -231,6 +244,9 @@ public static class ModularCharacterBuilder
     public struct Look
     {
         public Color skin, shorts, tankTop, suit, tie;
+        // Body shape: whole-body scale (x = width, y = height; zero = normal) and belly size (1 = none).
+        public Vector3 bodyScale;
+        public float belly;
     }
 
     public static GameObject Build(string id, string head, Look look, AnimatorController controller)
@@ -261,9 +277,12 @@ public static class ModularCharacterBuilder
 
         var armature = go.transform.Find("CharacterArmature");
         ParentFeetToLegs(armature);
+        Shape(armature, look);
         // Humanoid so the Universal Animation Library clips retarget onto this skeleton.
         var animator = go.AddComponent<Animator>();
         animator.avatar = BuildAvatar(go, id);
+        // Whole-body width / height after the avatar, so the humanoid skeleton stays normal-sized.
+        if (look.bodyScale != Vector3.zero) go.transform.localScale = look.bodyScale;
         animator.runtimeAnimatorController = controller;
         animator.applyRootMotion = false;
         animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;

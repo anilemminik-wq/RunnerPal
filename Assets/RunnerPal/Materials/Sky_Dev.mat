@@ -27,7 +27,7 @@ Material:
     m_Ints: []
     m_Floats:
     - _AtmosphereThickness: 0.6
-    - _Exposure: 0.8
+    - _Exposure: 0.3
     - _SunDisk: 2
     - _SunSize: 0.04
     - _SunSizeConvergence: 5

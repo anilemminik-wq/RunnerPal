@@ -8,7 +8,8 @@ license file next to it in `Assets/RunnerPal/ThirdParty/`, `Audio/SFX/LICENSES.t
 | Runner characters (and the clothes pickups, baked from the same parts) | Quaternius "Ultimate Modular Men" (quaternius.com) | `ThirdParty/Quaternius_UltimateModularMen/` |
 | Runner animations (run, jump, roll, hit, death) | Quaternius "Universal Animation Library" (quaternius.com) | `ThirdParty/Quaternius_UAL/` |
 | Coin, shield star, finish door and flags | Kenney "Platformer Kit" (kenney.nl) | `ThirdParty/Kenney_PlatformerKit/` |
-| Obstacles (road barrier, fence, warning lights) | Kenney "City Kit Roads" (kenney.nl) | `ThirdParty/Kenney_CityKitRoads/` |
+| Obstacles (road barrier, fence, warning lights, cones) | Kenney "City Kit Roads" (kenney.nl) | `ThirdParty/Kenney_CityKitRoads/` |
+| Cars (obstacles) and the taxi | Kenney "Car Kit" 3.1 (kenney.nl) | `ThirdParty/Kenney_CarKit/` |
 | Energy drink (speed boost), coffee cup (slow trap) | Kenney "Food Kit" (kenney.nl) | `ThirdParty/Kenney_FoodKit/` |
 | Laptop item | Kenney "Furniture Kit" (kenney.nl) | `ThirdParty/Kenney_FurnitureKit/` |
 | City buildings (office, bank, dev worlds) | Kenney "City Kit Commercial" 2.1 (kenney.nl) | `ThirdParty/Kenney_CityKitCommercial/` |

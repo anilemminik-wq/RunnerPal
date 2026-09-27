@@ -13,7 +13,11 @@ MonoBehaviour:
   m_Name: Character_kemal
   m_EditorClassIdentifier: Assembly-CSharp::CharacterData
   id: kemal
-  displayName: Kemal Abi
+  displayName: "\u015Ei\u015Fko John"
   price: 150
-  icon: {fileID: 17846306341849875, guid: 8767da4dfaa272d41a558b904a016c56, type: 3}
+  icon: {fileID: 21300000, guid: 8767da4dfaa272d41a558b904a016c56, type: 3}
   modelPrefab: {fileID: 8843198660310292544, guid: 314c2d75b786ef640bd974e21fd8f4e8, type: 3}
+  lives: 4
+  speedMultiplier: 0.9
+  jumpMultiplier: 0.85
+  description: "4 can! Ama biraz yava\u015F, az z\u0131plar."

@@ -67,6 +67,34 @@ Last updated: 2026-09-27. Read this first, then `CLAUDE.md`, then `RUNNERPAL_TAS
   Commercial (office / bank / dev) and Suburban (sales), scaled x9. Building shadows are off (phones).
   All third-party packs: `THIRD_PARTY.md`.
 
+## Beyond the spec (user requests, 2026-09-27) — these override the spec where they differ
+
+- **Characters play differently** (`CharacterData.lives / speedMultiplier / jumpMultiplier / description`, used
+  by `PlayerController` and `GameManager.LoadLevel`): Mehmet Bey 3 can normal; Şişko John (id `kemal`) 4 can,
+  %90 speed, %85 jump, wide body + belly; Sıska Manny (id `burak`) 1 can, %125 speed, thin and tall; Zıpzıp Hasan
+  (id `hasan`) 2 can, %140 jump. Ids kept so owned characters stay owned. Body shape: `Look.bodyScale` (model
+  root) + `Look.belly` (Abdomen bone girth, chest compensates) in `ModularCharacterBuilder`.
+- **Energy drink button** (right edge): the SpeedBoost pickup is now "ENERJİ" and goes into
+  `PlayerController.EnergyDrinks` (start 1, max 3); the button / key E spends one: x1.5 speed for 8 s. A hit or
+  the coffee trap ends it.
+- **Taxi** (rare: 3% per segment from level 2, max one per level, in the free lane): 6 s ride, full-size taxi
+  replaces the runner, gold flies to him (`Pickup` magnet), obstacles break without costing a life, speed =
+  level max x1.2. 1 s of invulnerability after getting out.
+- **Speed lines + FOV kick** while boosted / in the taxi (`Feedback/SpeedLines.cs`).
+- **Pause** (II top-left): DEVAM / YENİDEN BAŞLA / MENÜ; also pauses when the app goes to background.
+- **New obstacles** (unlock by `Obstacle.minLevel`): open manhole (3, jump it or change lane; sliding in = fall-in
+  effect), parked car (5), swaying barrier between the two neighbouring blocked lanes (8, only when the free lane is
+  at the edge so it never crosses it), oncoming car (12, drives 14 m inside its own segment). Cars get knocked away.
+- **Readable items:** clothes pickups are baked with the arms lowered, every pickup has a floating name tag (TMP) and
+  spins without it (`Pickup.spinTarget`). UI icons (`Sprites/Icon_*`) are rendered from the real pickup models;
+  the HUD checklist uses `ItemCard` (dark card → green + check when collected, pop animation).
+- **Level map** (`UI/LevelMap.cs`, MainMenu): bottom-to-top winding path, one zone per job with the city picture
+  (`Sprites/World_*`, rendered from that world's roads), the items that job needs ("YENİ" on the new one) and a
+  "TERFİ" badge between jobs. Tap an open level to play it (`SaveSystem.PlayLevel`, not saved);
+  `GameManager.NextLevel` goes to the level after the one played. KARAKTERLER opens the shop panel.
+- **Time of day per job:** `LevelData.sunColor / sunIntensity / sunAngle / ambientIntensity` (office morning, bank
+  golden hour, sales noon, developer night).
+
 ## Changes to the delivered scripts
 
 - `ItemType.cs`: added `ItemNames.Get` (Turkish display names); `GameManager` fail message and `GameUI` fallback

@@ -45,14 +45,17 @@ public class GameManager : MonoBehaviour
 
     void Start()
     {
-        int index = Mathf.Clamp(SaveSystem.UnlockedLevel - 1, 0, levels.Length - 1);
+        // Haritada seçilen bölüm (yoksa açılan son bölüm).
+        int chosen = SaveSystem.PlayLevel > 0 ? SaveSystem.PlayLevel : SaveSystem.UnlockedLevel;
+        int index = Mathf.Clamp(Mathf.Min(chosen, SaveSystem.UnlockedLevel) - 1, 0, levels.Length - 1);
+        SaveSystem.PlayLevel = index + 1;
         LoadLevel(index);
     }
 
     public void LoadLevel(int index)
     {
         Level = levels[index];
-        Lives = maxLives;
+        Lives = player.Character ? player.Character.lives : maxLives;
         LevelGold = 0;
         TimeLeft = Level.timeLimit;
         collected.Clear();
@@ -175,11 +178,51 @@ public class GameManager : MonoBehaviour
 
     // ---------- UI butonları ----------
 
-    public void RestartLevel() => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+    public void RestartLevel()
+    {
+        Time.timeScale = 1f;
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+    }
 
-    public void NextLevel() => RestartLevel(); // UnlockedLevel zaten ilerledi, sahne yeniden yüklenince sıradaki başlar
+    // Oynanan bölümün bir sonrakine geç (haritadan eski bir bölüm oynandıysa da doğru sıradaki gelir).
+    public void NextLevel()
+    {
+        SaveSystem.PlayLevel = Mathf.Min(Array.IndexOf(levels, Level) + 2, levels.Length);
+        RestartLevel();
+    }
 
-    public void GoToMenu() => SceneManager.LoadScene("MainMenu");
+    public void GoToMenu()
+    {
+        Time.timeScale = 1f;
+        SceneManager.LoadScene("MainMenu");
+    }
+
+    // ---------- Duraklatma (oyun sırasında sol üstteki buton) ----------
+
+    public bool IsPaused { get; private set; }
+    public event Action<bool> OnPauseChanged;
+
+    public void Pause()
+    {
+        if (CurrentState != State.Running || IsPaused) return;
+        IsPaused = true;
+        Time.timeScale = 0f;
+        OnPauseChanged?.Invoke(true);
+    }
+
+    public void Resume()
+    {
+        if (!IsPaused) return;
+        IsPaused = false;
+        Time.timeScale = 1f;
+        OnPauseChanged?.Invoke(false);
+    }
+
+    // Telefon arka plana alınınca oyun kendiliğinden duraklar.
+    void OnApplicationPause(bool paused)
+    {
+        if (paused) Pause();
+    }
 
     // ---------- Tema ----------
 
@@ -187,5 +230,13 @@ public class GameManager : MonoBehaviour
     {
         if (Level.skyboxMaterial) RenderSettings.skybox = Level.skyboxMaterial;
         RenderSettings.fogColor = Level.fogColor;
+        var sun = RenderSettings.sun ? RenderSettings.sun : FindFirstObjectByType<Light>();
+        if (sun)
+        {
+            sun.color = Level.sunColor;
+            sun.intensity = Level.sunIntensity;
+            sun.transform.rotation = Quaternion.Euler(Level.sunAngle, -30f, 0f);
+        }
+        RenderSettings.ambientIntensity = Level.ambientIntensity;
     }
 }

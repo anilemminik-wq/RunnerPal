@@ -54,3 +54,7 @@ MonoBehaviour:
   - {fileID: 3423130848819705290, guid: 3a97143f999c0894f8a75a3e5d1478b8, type: 3}
   skyboxMaterial: {fileID: 2100000, guid: 88a9247953f0437478696ae3d6c7971f, type: 2}
   fogColor: {r: 0.7, g: 0.88, b: 0.8, a: 1}
+  sunColor: {r: 1, g: 1, b: 0.95, a: 1}
+  sunIntensity: 1.4
+  sunAngle: 62
+  ambientIntensity: 1.1

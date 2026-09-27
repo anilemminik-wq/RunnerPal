@@ -67,6 +67,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b6e08717848056545a9706926f479827, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Obstacle
+  kind: 0
+  minLevel: 1
   debrisCount: 8
   debrisMaterial: {fileID: 2100000, guid: bfa6f9882edf66f4bb0ba2c307ffb98a, type: 2}
 --- !u!1001 &5568464656655682455

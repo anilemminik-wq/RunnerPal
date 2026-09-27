@@ -40,6 +40,11 @@ public class LevelData : ScriptableObject
     public GameObject[] roadSegmentPrefabs;   // Bu temaya ait yol parçaları
     public Material skyboxMaterial;
     public Color fogColor = Color.gray;
+    [Tooltip("Günün saati: güneşin rengi, gücü ve yüksekliği (gece için düşük güç)")]
+    public Color sunColor = Color.white;
+    public float sunIntensity = 1.2f;
+    public float sunAngle = 50f;
+    public float ambientIntensity = 1f;
 
     public float GetSpeed(float progress01)
     {

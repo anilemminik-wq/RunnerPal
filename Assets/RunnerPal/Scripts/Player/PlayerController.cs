@@ -20,14 +20,34 @@ public class PlayerController : MonoBehaviour
     [Header("Swipe")]
     public float minSwipeDistance = 50f;      // piksel
 
+    [Header("Enerji içeceği (sağdaki buton)")]
+    public int startEnergyDrinks = 1;
+    public int maxEnergyDrinks = 3;
+    public float energyDuration = 8f;
+    public float energyMultiplier = 1.5f;
+
+    [Header("Taksi (nadir güçlendirici)")]
+    [Tooltip("Taksideyken hız = bölümün en yüksek hızı x bu değer")]
+    public float taxiSpeedFactor = 1.2f;
+    [Tooltip("Taksiye binince görünen model (Player altında, kapalı başlar)")]
+    public GameObject taxiModel;
+
     [Header("Karakterler (mağazadakilerle aynı liste)")]
     public CharacterData[] characters;
     public Transform modelRoot;               // Modelin yerleşeceği boş child obje
 
     public PlayerOutfit Outfit { get; private set; }
+    public CharacterData Character { get; private set; }
     public float DistanceTravelled { get; private set; }
     public float CurrentSpeed { get; private set; }
     public bool HasShield => shieldTimer > 0f;
+    public bool InTaxi => taxiTimer > 0f;
+    public float TaxiTimeLeft => taxiTimer;
+    // Hız çizgileri için: 1 = normal, >1 = hızlanmış.
+    public float SpeedFactor => InTaxi ? 2f : speedMul;
+    public bool EnergyActive => energyTimer > 0f;
+    public float EnergyTimeLeft => energyTimer;
+    public int EnergyDrinks { get; private set; }
 
     Animator anim;
     CapsuleCollider col;
@@ -40,6 +60,8 @@ public class PlayerController : MonoBehaviour
     float slideTimer;
 
     float speedMul = 1f, speedMulTimer;  // hızlanma / yavaşlama tuzağı
+    float energyTimer;
+    float taxiTimer;
     float shieldTimer;
     float invulnTimer;
 
@@ -53,6 +75,9 @@ public class PlayerController : MonoBehaviour
         col = GetComponent<CapsuleCollider>();
         colHeight = col.height; colCenter = col.center;
         groundY = transform.position.y;
+        if (Character) jumpHeight *= Character.jumpMultiplier;
+        EnergyDrinks = startEnergyDrinks;
+        if (taxiModel) taxiModel.SetActive(false);
 
         var rb = GetComponent<Rigidbody>();
         rb.isKinematic = true;     // Hareket kodla, fizik sadece tetikleyiciler için
@@ -67,16 +92,19 @@ public class PlayerController : MonoBehaviour
         foreach (var ch in characters)
         {
             if (ch.id != id || !ch.modelPrefab) continue;
+            Character = ch;
             foreach (Transform c in modelRoot) DestroyImmediate(c.gameObject);
             Instantiate(ch.modelPrefab, modelRoot);
             return;
         }
+        if (characters.Length > 0) Character = characters[0];
     }
 
     public void BeginRun()
     {
         running = true;
         anim?.SetBool("Running", true);
+        EnergyChanged?.Invoke(EnergyDrinks);
     }
 
     public void StopRun()
@@ -84,18 +112,22 @@ public class PlayerController : MonoBehaviour
         running = false;
         CurrentSpeed = 0f;
         anim?.SetBool("Running", false);
+        if (InTaxi) EndTaxi();
     }
 
     void Update()
     {
-        if (!running) return;
+        if (!running || Time.timeScale == 0f) return;
 
         HandleInput();
         UpdateTimers();
 
-        // İleri hareket: hız bölüm ilerledikçe artar
+        // İleri hareket: hız bölüm ilerledikçe artar; karakterin hız çarpanı ve taksi de etkiler
         var gm = GameManager.Instance;
-        CurrentSpeed = gm.Level.GetSpeed(gm.Progress01) * speedMul;
+        float characterSpeed = Character ? Character.speedMultiplier : 1f;
+        CurrentSpeed = InTaxi
+            ? gm.Level.maxSpeed * taxiSpeedFactor
+            : gm.Level.GetSpeed(gm.Progress01) * speedMul * characterSpeed;
         float forward = CurrentSpeed * Time.deltaTime;
         DistanceTravelled += forward;
 
@@ -124,6 +156,7 @@ public class PlayerController : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.D)) MoveLane(1);
         if (Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.W)) Jump();
         if (Input.GetKeyDown(KeyCode.DownArrow) || Input.GetKeyDown(KeyCode.S)) Slide();
+        if (Input.GetKeyDown(KeyCode.E)) UseEnergyDrink();
 
         // Dokunmatik swipe
         if (Input.touchCount == 0) return;
@@ -146,7 +179,7 @@ public class PlayerController : MonoBehaviour
 
     void Jump()
     {
-        if (!IsGrounded) return;
+        if (!IsGrounded || InTaxi) return;
         EndSlide();
         verticalVel = Mathf.Sqrt(2f * -gravity * jumpHeight);
         anim?.SetTrigger("Jump");
@@ -155,6 +188,7 @@ public class PlayerController : MonoBehaviour
 
     void Slide()
     {
+        if (InTaxi) return;
         if (!IsGrounded) verticalVel = gravity * 0.5f; // Havadaysa hızlıca in
         sliding = true;
         slideTimer = slideDuration;
@@ -179,27 +213,78 @@ public class PlayerController : MonoBehaviour
         if (sliding && (slideTimer -= Time.deltaTime) <= 0f) EndSlide();
         if (shieldTimer > 0f) shieldTimer -= Time.deltaTime;
         if (invulnTimer > 0f) invulnTimer -= Time.deltaTime;
+        if (energyTimer > 0f) energyTimer -= Time.deltaTime;
         if (speedMulTimer > 0f && (speedMulTimer -= Time.deltaTime) <= 0f) speedMul = 1f;
+        if (taxiTimer > 0f && (taxiTimer -= Time.deltaTime) <= 0f) EndTaxi();
     }
 
     public void ApplySpeedModifier(float multiplier, float duration)
     {
         speedMul = multiplier;
         speedMulTimer = duration;
+        if (multiplier < 1f) energyTimer = 0f; // tuzak / çarpma enerjiyi keser
     }
 
     public void ApplyShield(float duration) => shieldTimer = duration;
 
+    // Yoldan toplanan enerji içeceği sağdaki butona eklenir.
+    public void AddEnergyDrink()
+    {
+        EnergyDrinks = Mathf.Min(EnergyDrinks + 1, maxEnergyDrinks);
+        EnergyChanged?.Invoke(EnergyDrinks);
+    }
+
+    // Sağdaki buton: bir içecek harcar, 8 saniye hızlanır.
+    public void UseEnergyDrink()
+    {
+        if (!running || Time.timeScale == 0f || EnergyDrinks <= 0 || EnergyActive || InTaxi) return;
+        EnergyDrinks--;
+        energyTimer = energyDuration;
+        ApplySpeedModifier(energyMultiplier, energyDuration);
+        EnergyChanged?.Invoke(EnergyDrinks);
+        EnergyUsed?.Invoke();
+    }
+
+    // Taksi: altınlar kendiliğinden gelir, engeller can götürmez, en yüksek hızda gidilir.
+    public void EnterTaxi(float duration)
+    {
+        EndSlide();
+        verticalVel = 0f;
+        var p = transform.position; p.y = groundY; transform.position = p;
+        taxiTimer = Mathf.Max(taxiTimer, duration);
+        if (taxiModel) taxiModel.SetActive(true);
+        if (modelRoot) modelRoot.gameObject.SetActive(false);
+        TaxiChanged?.Invoke(true);
+    }
+
+    void EndTaxi()
+    {
+        taxiTimer = 0f;
+        if (taxiModel) taxiModel.SetActive(false);
+        if (modelRoot)
+        {
+            modelRoot.gameObject.SetActive(true);
+            anim?.SetBool("Running", running);
+        }
+        // İnince kısa dokunulmazlık, önüne çıkan engele hemen çarpmasın.
+        invulnTimer = Mathf.Max(invulnTimer, 1f);
+        TaxiChanged?.Invoke(false);
+    }
+
     // Ses ve görsel geri bildirim için (kurallar değişmez).
     public event System.Action Jumped;
     public event System.Action Slid;
-    // Engel, can gitti mi (kalkanla çarpınca false).
+    public event System.Action<int> EnergyChanged;
+    public event System.Action EnergyUsed;
+    public event System.Action<bool> TaxiChanged;
+    // Engel, can gitti mi (kalkanla / taksiyle çarpınca false).
     public event System.Action<Obstacle, bool> HitObstacle;
     public bool IsInvulnerable => invulnTimer > 0f;
 
     // Engel çarpınca Obstacle çağırır
     public void OnHitObstacle(Obstacle obstacle = null)
     {
+        if (InTaxi) { HitObstacle?.Invoke(obstacle, false); return; }
         if (invulnTimer > 0f) return;
         if (HasShield) { HitObstacle?.Invoke(obstacle, false); return; }
         invulnTimer = hitInvulnerability;

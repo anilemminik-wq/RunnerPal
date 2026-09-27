@@ -18,6 +18,15 @@ public class TrackSpawner : MonoBehaviour
     public GameObject slowTrapPrefab;      // Pickup (SlowTrap)
     public GameObject finishPrefab;        // FinishLine.cs (iş yeri kapısı)
 
+    [Header("Çeşitlilik")]
+    [Tooltip("İki komşu şerit arasında kayan engel (ObstacleMover Sway)")]
+    public GameObject swayingObstaclePrefab;
+    [Range(0f, 1f)] public float swayChance = 0.3f;
+    [Tooltip("Nadir taksi: altınları çeker, engeller can götürmez, en yüksek hız")]
+    public GameObject taxiPrefab;
+    [Range(0f, 1f)] public float taxiChance = 0.03f;
+    public int taxiFromLevel = 2;
+
     [System.Serializable]
     public struct ItemPrefab { public ItemType item; public GameObject prefab; }
     public ItemPrefab[] itemPrefabs;       // Her eşya için Pickup (Item) prefabı
@@ -48,6 +57,17 @@ public class TrackSpawner : MonoBehaviour
             itemSlots[Mathf.FloorToInt(z / segmentLength)] = items[i];
         }
 
+        // Bu bölümde çıkabilecek engeller (yeni türler ilerleyen bölümlerde açılır)
+        var obstacles = new List<GameObject>();
+        foreach (var o in obstaclePrefabs)
+        {
+            var ob = o ? o.GetComponent<Obstacle>() : null;
+            if (ob && ob.minLevel <= level.levelNumber) obstacles.Add(o);
+        }
+        var sway = swayingObstaclePrefab ? swayingObstaclePrefab.GetComponent<Obstacle>() : null;
+        bool canSway = sway && sway.minLevel <= level.levelNumber;
+        bool taxiPlaced = false;
+
         // 3) Her segmente içerik
         int firstSeg = Mathf.CeilToInt(safeStartDistance / segmentLength);
         int lastSeg = Mathf.FloorToInt((level.levelLength - segmentLength) / segmentLength);
@@ -60,12 +80,34 @@ public class TrackSpawner : MonoBehaviour
             if (itemSlots.TryGetValue(s, out var item))
                 SpawnItem(item, LanePos(freeLane, z));
 
-            // Engeller: serbest şerit dışındaki şeritlere
-            for (int lane = 0; lane < 3; lane++)
+            // Engeller: serbest şerit dışındaki şeritlere.
+            // Serbest şerit kenardaysa diğer iki şerit komşudur: aralarında kayan tek bir engel olabilir.
+            if (canSway && freeLane != 1 && Random.value < swayChance * level.obstacleChance)
             {
-                if (lane == freeLane) continue;
-                if (Random.value < level.obstacleChance && obstaclePrefabs.Length > 0)
-                    Spawn(obstaclePrefabs[Random.Range(0, obstaclePrefabs.Length)], LanePos(lane, z));
+                int a = freeLane == 0 ? 1 : 0;
+                Spawn(swayingObstaclePrefab, (LanePos(a, z) + LanePos(a + 1, z)) * 0.5f);
+            }
+            else
+            {
+                for (int lane = 0; lane < 3; lane++)
+                {
+                    if (lane == freeLane) continue;
+                    if (Random.value < level.obstacleChance && obstacles.Count > 0)
+                    {
+                        var o = obstacles[Random.Range(0, obstacles.Count)];
+                        // Karşıdan gelen araba yol parçasının sonundan başlar, parçanın başına kadar gelir.
+                        var mover = o.GetComponent<ObstacleMover>();
+                        float dz = mover && mover.mode == ObstacleMover.Mode.Drive ? mover.driveDistance * 0.5f : 0f;
+                        Spawn(o, LanePos(lane, z + dz));
+                    }
+                }
+            }
+
+            // Taksi: çok nadir, bölümde en fazla bir kez, serbest şeritte
+            if (!taxiPlaced && taxiPrefab && level.levelNumber >= taxiFromLevel && Random.value < taxiChance)
+            {
+                taxiPlaced = true;
+                Spawn(taxiPrefab, LanePos(freeLane, z + 6f) + Vector3.up * 0.8f); // altın dizisi ve eşyadan sonra
             }
 
             // Altın dizisi (kıyafetin önünde, serbest şeritte)
