@@ -27,7 +27,12 @@ public static class ModularCharacterBuilder
             AssetDatabase.CreateAsset(m, path);
         }
         m.SetColor("_BaseColor", color);
-        m.SetFloat("_Smoothness", smooth);
+        // Cartoon look, matching build_assets.cs: no shiny plastic highlight or mirror reflection.
+        m.SetFloat("_Smoothness", Mathf.Min(smooth, 0.3f));
+        m.SetFloat("_SpecularHighlights", 0f);
+        m.SetFloat("_EnvironmentReflections", 0f);
+        m.EnableKeyword("_SPECULARHIGHLIGHTS_OFF");
+        m.EnableKeyword("_ENVIRONMENTREFLECTIONS_OFF");
         EditorUtility.SetDirty(m);
         return m;
     }

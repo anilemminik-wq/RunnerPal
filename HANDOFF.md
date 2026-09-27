@@ -22,6 +22,17 @@ Last updated: 2026-09-27. Read this first, then `CLAUDE.md`, then `RUNNERPAL_TAS
   `TrackSpawner.swayingObstaclePrefab` -> `swayingObstaclePrefabs[]` (picks one at random) to fit it in
   alongside the swaying barrier.
 - City buildings (Kenney kits) were left as-is — re-texturing/rebuilding those was out of scope for this pass.
+
+**Follow-up the same day:** user said the first pass still looked "bad / nothing matches" and asked for a full
+redo, referencing Subway Surfers. Since hand-painted textures are out of reach, the fix was palette + shading,
+not geometry: `mat()` / `Lit()` now force `_SpecularHighlights` and `_EnvironmentReflections` off everywhere
+(kills the shiny-plastic look), and Kenney's city buildings — previously stuck at their default grey/beige
+`colormap` material — get tinted per-instance from a per-world candy palette (`buildingPalettes` in
+`build_assets.cs`; `tint()` duplicates the shared material per (material, color) pair, trees keep a white/no-op
+tint so foliage stays natural). Road/curb/sidewalk/lamp colors and the global post-process (saturation, contrast,
+bloom) were all pushed further. This made a real difference — screenshots after vs. before are night and day.
+**Gotcha:** the very first character portrait rendered in a session can still come out blank even with the
+double-render in `portrait()`; re-running `build_assets.cs` a second time fixes it (shaders fully warmed up).
 ## Where things stand
 
 - Project created with the Unity CLI from the 3D URP template; the spec's scripts are in

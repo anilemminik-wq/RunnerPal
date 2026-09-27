@@ -16,7 +16,14 @@ System.Func<string, UnityEngine.Color, float, UnityEngine.Material> mat = (name,
     if (m == null) { m = new UnityEngine.Material(lit); UnityEditor.AssetDatabase.CreateAsset(m, path); }
     m.shader = lit;
     m.SetColor("_BaseColor", color);
-    m.SetFloat("_Smoothness", smooth);
+    // Cartoon look: no shiny plastic highlight or mirror-like environment reflection, just soft flat shading.
+    // (The shader keywords are what actually turn these off at render time; the float properties just mirror
+    // them for the material inspector's checkboxes.)
+    m.SetFloat("_Smoothness", UnityEngine.Mathf.Min(smooth, 0.35f));
+    m.SetFloat("_SpecularHighlights", 0f);
+    m.SetFloat("_EnvironmentReflections", 0f);
+    m.EnableKeyword("_SPECULARHIGHLIGHTS_OFF");
+    m.EnableKeyword("_ENVIRONMENTREFLECTIONS_OFF");
     UnityEditor.EditorUtility.SetDirty(m);
     return m;
 };
@@ -52,9 +59,9 @@ var shieldMat = glow("Shield", new UnityEngine.Color(0.3f, 0.6f, 1f));
 var coffeeMat = mat("Coffee", new UnityEngine.Color(0.3f, 0.17f, 0.08f), 0.9f);
 var obstacleMat = mat("Obstacle", new UnityEngine.Color(0.9f, 0.32f, 0.2f), 0.3f);
 var barrierMat = mat("Barrier", new UnityEngine.Color(0.95f, 0.8f, 0.15f), 0.3f);
-var postMat = mat("Post", new UnityEngine.Color(0.25f, 0.25f, 0.28f), 0.2f);
+var postMat = mat("Post", new UnityEngine.Color(0.35f, 0.38f, 0.45f), 0.2f);
 var lineMat = mat("LaneLine", new UnityEngine.Color(0.95f, 0.95f, 0.9f), 0.1f);
-var curbMat = mat("Curb", new UnityEngine.Color(0.6f, 0.6f, 0.62f), 0.1f);
+var curbMat = mat("Curb", new UnityEngine.Color(0.88f, 0.86f, 0.8f), 0.1f);
 var doorMat = mat("Door", new UnityEngine.Color(0.2f, 0.55f, 0.35f), 0.4f);
 
 // ---------- Sprites (generated textures) ----------
@@ -559,21 +566,31 @@ var finishPrefab = save(finishGo, "Finish");
 // 20 m long, 3 lanes of 2.5 m (road 7.5 m wide), sidewalks, street lamps, a row of buildings facing the road and a
 // bigger skyline row behind. Buildings: Kenney City Kit Commercial / Suburban (CC0), scaled x9 (1 unit ~ 9 m).
 string[] worlds = { "Office", "Bank", "Sales", "Dev" };
+// Subway-Surfers-style candy palette: roads/skies/land are saturated, not the muted greys a "realistic" city uses.
 UnityEngine.Color[] groundColors =
 {
-    new UnityEngine.Color(0.3f, 0.32f, 0.36f), new UnityEngine.Color(0.36f, 0.3f, 0.26f),
-    new UnityEngine.Color(0.24f, 0.33f, 0.3f), new UnityEngine.Color(0.2f, 0.22f, 0.32f),
+    new UnityEngine.Color(0.36f, 0.4f, 0.48f), new UnityEngine.Color(0.42f, 0.32f, 0.24f),
+    new UnityEngine.Color(0.28f, 0.4f, 0.34f), new UnityEngine.Color(0.22f, 0.2f, 0.4f),
 };
 UnityEngine.Color[] fogColors =
 {
-    new UnityEngine.Color(0.72f, 0.82f, 0.92f), new UnityEngine.Color(0.9f, 0.8f, 0.66f),
-    new UnityEngine.Color(0.7f, 0.88f, 0.8f), new UnityEngine.Color(0.35f, 0.38f, 0.55f),
+    new UnityEngine.Color(0.55f, 0.78f, 0.98f), new UnityEngine.Color(1f, 0.78f, 0.55f),
+    new UnityEngine.Color(0.55f, 0.9f, 0.85f), new UnityEngine.Color(0.32f, 0.3f, 0.6f),
 };
 // Ground beyond the sidewalks: plaza stone in town, grass in the suburbs.
 UnityEngine.Color[] landColors =
 {
-    new UnityEngine.Color(0.55f, 0.55f, 0.53f), new UnityEngine.Color(0.6f, 0.56f, 0.5f),
-    new UnityEngine.Color(0.35f, 0.55f, 0.3f), new UnityEngine.Color(0.3f, 0.3f, 0.36f),
+    new UnityEngine.Color(0.68f, 0.68f, 0.6f), new UnityEngine.Color(0.72f, 0.62f, 0.48f),
+    new UnityEngine.Color(0.4f, 0.68f, 0.32f), new UnityEngine.Color(0.34f, 0.32f, 0.48f),
+};
+// Candy tints applied per building (see placeBuilding): each world gets its own bright, cohesive family of hues
+// instead of Kenney's default grey/beige concrete, so the skyline reads as one deliberate color story.
+UnityEngine.Color[][] buildingPalettes =
+{
+    new[] { new UnityEngine.Color(1f, 0.86f, 0.7f), new UnityEngine.Color(0.85f, 0.93f, 1f), new UnityEngine.Color(1f, 0.78f, 0.8f), new UnityEngine.Color(0.8f, 0.95f, 0.85f) },
+    new[] { new UnityEngine.Color(1f, 0.82f, 0.5f), new UnityEngine.Color(0.9f, 0.6f, 0.45f), new UnityEngine.Color(1f, 0.9f, 0.75f), new UnityEngine.Color(0.75f, 0.55f, 0.65f) },
+    new[] { new UnityEngine.Color(1f, 0.95f, 0.75f), new UnityEngine.Color(0.75f, 0.9f, 0.6f), new UnityEngine.Color(0.95f, 0.8f, 0.6f), new UnityEngine.Color(0.7f, 0.85f, 0.9f) },
+    new[] { new UnityEngine.Color(0.55f, 0.55f, 0.85f), new UnityEngine.Color(0.4f, 0.65f, 0.9f), new UnityEngine.Color(0.7f, 0.5f, 0.85f), new UnityEngine.Color(0.45f, 0.75f, 0.8f) },
 };
 const string commercial = "Assets/RunnerPal/ThirdParty/Kenney_CityKitCommercial/";
 const string suburban = "Assets/RunnerPal/ThirdParty/Kenney_CityKitSuburban/";
@@ -609,17 +626,52 @@ UnityEngine.GameObject[] CombineTowers(UnityEngine.GameObject[] a, UnityEngine.G
     return l.ToArray();
 }
 
-var sidewalkMat = mat("Sidewalk", new UnityEngine.Color(0.72f, 0.72f, 0.7f), 0.1f);
-var lampMat = mat("LampPost", new UnityEngine.Color(0.2f, 0.21f, 0.24f), 0.4f);
+var sidewalkMat = mat("Sidewalk", new UnityEngine.Color(0.86f, 0.84f, 0.78f), 0.1f);
+var lampMat = mat("LampPost", new UnityEngine.Color(0.25f, 0.3f, 0.4f), 0.4f);
 var lampLight = glow("LampLight", new UnityEngine.Color(1f, 0.92f, 0.7f));
 
+// Recolors a Kenney model in place: duplicates its shared "colormap" material with a tinted _BaseColor (keeping
+// the same texture/UVs), one duplicate per (material, color) pair so buildings sharing a color don't each get
+// their own asset. This is what turns Kenney's default grey/beige concrete into the game's own candy palette.
+var tintCache = new System.Collections.Generic.Dictionary<string, UnityEngine.Material>();
+System.Action<UnityEngine.GameObject, UnityEngine.Color> tint = (go, color) =>
+{
+    foreach (var r in go.GetComponentsInChildren<UnityEngine.Renderer>())
+    {
+        var mats = r.sharedMaterials;
+        for (int i = 0; i < mats.Length; i++)
+        {
+            var baseMat = mats[i];
+            if (baseMat == null) continue;
+            string key = baseMat.name + "_" + UnityEngine.ColorUtility.ToHtmlStringRGB(color);
+            if (!tintCache.TryGetValue(key, out var tinted))
+            {
+                string path = root + "Materials/Tint_" + key + ".mat";
+                tinted = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.Material>(path);
+                if (tinted == null) { tinted = new UnityEngine.Material(baseMat); UnityEditor.AssetDatabase.CreateAsset(tinted, path); }
+                else tinted.CopyPropertiesFromMaterial(baseMat);
+                tinted.SetColor("_BaseColor", color);
+                tinted.SetFloat("_Smoothness", 0.25f);
+                tinted.SetFloat("_SpecularHighlights", 0f);
+                tinted.SetFloat("_EnvironmentReflections", 0f);
+                tinted.EnableKeyword("_SPECULARHIGHLIGHTS_OFF");
+                tinted.EnableKeyword("_ENVIRONMENTREFLECTIONS_OFF");
+                UnityEditor.EditorUtility.SetDirty(tinted);
+                tintCache[key] = tinted;
+            }
+            mats[i] = tinted;
+        }
+        r.sharedMaterials = mats;
+    }
+};
 // Places one building with its front towards the road; returns its width along the road.
-System.Func<UnityEngine.GameObject, UnityEngine.Transform, float, float, bool, float, float> placeBuilding = (src, parent, z, innerX, left, scale) =>
+System.Func<UnityEngine.GameObject, UnityEngine.Transform, float, float, bool, float, UnityEngine.Color, float> placeBuilding = (src, parent, z, innerX, left, scale, color) =>
 {
     var b = (UnityEngine.GameObject)UnityEditor.PrefabUtility.InstantiatePrefab(src, parent);
     b.transform.localScale = UnityEngine.Vector3.one * scale;
     // Kenney fronts face +Z; turn them to face the road.
     b.transform.localRotation = UnityEngine.Quaternion.Euler(0f, left ? 90f : -90f, 0f);
+    tint(b, color);
     var bounds = new UnityEngine.Bounds(b.transform.position, UnityEngine.Vector3.zero);
     bool first = true;
     foreach (var r in b.GetComponentsInChildren<UnityEngine.Renderer>())
@@ -633,13 +685,14 @@ System.Func<UnityEngine.GameObject, UnityEngine.Transform, float, float, bool, f
     return width;
 };
 // Fills [0, 20) along one side with buildings from `set`, leaving small gaps.
-System.Action<UnityEngine.Transform, UnityEngine.GameObject[], bool, float, float, float, System.Random> fillSide = (parent, set, left, innerX, scale, gap, rng) =>
+System.Action<UnityEngine.Transform, UnityEngine.GameObject[], bool, float, float, float, System.Random, UnityEngine.Color[]> fillSide = (parent, set, left, innerX, scale, gap, rng, palette) =>
 {
     float z = (float)rng.NextDouble() * 1.5f;
     for (int guard = 0; guard < 12 && z < 19f; guard++)
     {
         var src = set[rng.Next(set.Length)];
-        float w = placeBuilding(src, parent, z, innerX, left, scale * (0.9f + (float)rng.NextDouble() * 0.2f));
+        var color = palette[rng.Next(palette.Length)];
+        float w = placeBuilding(src, parent, z, innerX, left, scale * (0.9f + (float)rng.NextDouble() * 0.2f), color);
         if (z + w > 20.5f) { UnityEngine.Object.DestroyImmediate(parent.GetChild(parent.childCount - 1).gameObject); break; }
         z += w + gap;
     }
@@ -677,10 +730,12 @@ for (int w = 0; w < 4; w++)
         var back = new UnityEngine.GameObject("Skyline").transform;
         back.SetParent(go.transform, false);
         bool suburbs = w == 2;
+        // Trees keep their own natural greens/browns; only the man-made buildings get the world's candy palette.
+        var treePalette = new[] { new UnityEngine.Color(0.95f, 0.95f, 0.95f) }; // near-white so their own leaf/bark colors show through unchanged
         foreach (bool left in new[] { true, false })
         {
-            fillSide(front, frontSets[w], left, 7.2f, suburbs ? 7.5f : 9f, suburbs ? 3f : 0.6f, rng);
-            fillSide(back, backSets[w], left, suburbs ? 22f : 30f, suburbs ? 12f : 14f, suburbs ? 1.5f : 2f, rng);
+            fillSide(front, frontSets[w], left, 7.2f, suburbs ? 7.5f : 9f, suburbs ? 3f : 0.6f, rng, buildingPalettes[w]);
+            fillSide(back, backSets[w], left, suburbs ? 22f : 30f, suburbs ? 12f : 14f, suburbs ? 1.5f : 2f, rng, suburbs ? treePalette : buildingPalettes[w]);
         }
         roadSets[w][v] = save(go, "Road_" + worlds[w] + "_" + v);
     }
